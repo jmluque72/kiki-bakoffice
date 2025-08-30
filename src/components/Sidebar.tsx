@@ -8,11 +8,16 @@ import {
   CreditCard,
   Activity,
   Calendar,
-  CheckSquare,
   Building2,
   LogOut,
   Menu,
-  X
+  X,
+  Clock,
+  GraduationCap,
+  UserCheck,
+  UserPlus,
+  Bell,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -30,16 +35,21 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection, onSectionChange }) => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const menuItems: SidebarItem[] = [
-    { icon: Home, label: 'Dashboard', key: 'dashboard' },
-    { icon: CreditCard, label: 'Instituciones', key: 'accounts' },
+    ...(user?.role?.nombre === 'superadmin' ? [{ icon: Home, label: 'Dashboard', key: 'dashboard' }] : []),
+    ...(user?.role?.nombre === 'superadmin' ? [{ icon: CreditCard, label: 'Instituciones', key: 'accounts' }] : []),
     { icon: Users, label: 'Usuarios', key: 'usuarios' },
     { icon: Activity, label: 'Activity', key: 'activity' },
     { icon: Calendar, label: 'Eventos', key: 'eventos' },
-    { icon: CheckSquare, label: 'Aprobaciones', key: 'aprobaciones' },
+    { icon: Bell, label: 'Notificaciones', key: 'notificaciones' },
     { icon: Building2, label: 'Divisiones', key: 'divisiones' },
+    { icon: UserCheck, label: 'Coordinadores', key: 'coordinadores' },
+    { icon: UserPlus, label: 'Tutores', key: 'tutores' },
+    { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
+    { icon: Clock, label: 'Asistencias', key: 'asistencias' },
+    { icon: Shield, label: 'Quién Retira', key: 'pickup' },
   ];
 
   const handleSectionClick = (sectionKey: string) => {
@@ -64,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Backoffice</h2>
+          <h2 className="text-xl font-bold text-gray-900">KIKI</h2>
           <button
             onClick={onClose}
             className="lg:hidden text-gray-500 hover:text-gray-700 transition-colors"

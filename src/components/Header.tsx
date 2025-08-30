@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, Bell, User } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { ApiStatus } from './ApiStatus';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -17,7 +18,6 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection }) =
       usuarios: 'Usuarios',
       activity: 'Activity',
       eventos: 'Eventos',
-      aprobaciones: 'Aprobaciones',
       divisiones: 'Divisiones'
     };
     return titles[section] || 'Dashboard';
@@ -42,9 +42,11 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection }) =
             <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
           </button>
           
+          <ApiStatus />
+          
           <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
             <User className="w-5 h-5 text-gray-600" />
-            <span className="text-sm font-medium text-gray-900">{user?.name}</span>
+            <span className="text-sm font-medium text-gray-900">{user?.nombre}</span>
           </div>
         </div>
       </div>

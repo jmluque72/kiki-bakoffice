@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 
@@ -6,21 +6,42 @@ export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, error: authError } = useAuth();
+
+  // Limpiar error cuando el usuario empiece a escribir
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (authError) {
+      // Limpiar error al escribir
+    }
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (authError) {
+      // Limpiar error al escribir
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    e.stopPropagation();
     
     if (!email || !password) {
-      setError('Por favor, completa todos los campos');
+      return;
+    }
+
+    // Evitar múltiples envíos mientras está cargando
+    if (isLoading) {
       return;
     }
 
     const success = await login(email, password);
+    
+    // Si el login falla, no hacer nada más (no redirigir)
     if (!success) {
-      setError('Credenciales inválidas. Usa: admin@backoffice.com / admin123');
+      // El error ya se maneja en el hook useAuth y se muestra en el UI
+      return;
     }
   };
 
@@ -35,14 +56,14 @@ export const Login: React.FC = () => {
           <p className="text-gray-600">Inicia sesión para continuar</p>
         </div>
 
-        {error && (
+        {authError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-500" />
-            <span className="text-red-700 text-sm">{error}</span>
+            <span className="text-red-700 text-sm">{authError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email
@@ -52,7 +73,7 @@ export const Login: React.FC = () => {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={handleEmailChange}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="tu@email.com"
                 disabled={isLoading}
@@ -69,7 +90,7 @@ export const Login: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Tu contraseña"
                 disabled={isLoading}
@@ -93,14 +114,6 @@ export const Login: React.FC = () => {
             {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
-
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 text-center">
-            <strong>Credenciales de demo:</strong><br />
-            Email: admin@backoffice.com<br />
-            Contraseña: admin123
-          </p>
-        </div>
       </div>
     </div>
   );

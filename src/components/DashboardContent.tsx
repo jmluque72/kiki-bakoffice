@@ -2,8 +2,8 @@ import React from 'react';
 import { 
   TrendingUp, 
   Users, 
-  ShoppingCart, 
-  DollarSign,
+  Building2, 
+  Calendar,
   Activity,
   ArrowUpRight,
   ArrowDownRight
@@ -12,12 +12,12 @@ import {
 export const DashboardContent: React.FC = () => {
   const stats = [
     {
-      title: 'Ingresos Totales',
-      value: '$45,231',
-      change: '+12%',
+      title: 'Instituciones Activas',
+      value: '12',
+      change: '+8%',
       trending: 'up',
-      icon: DollarSign,
-      color: 'bg-green-500'
+      icon: Building2,
+      color: 'bg-blue-500'
     },
     {
       title: 'Usuarios Activos',
@@ -25,22 +25,22 @@ export const DashboardContent: React.FC = () => {
       change: '+18%',
       trending: 'up',
       icon: Users,
-      color: 'bg-blue-500'
+      color: 'bg-green-500'
     },
     {
-      title: 'Órdenes',
-      value: '186',
-      change: '-3%',
-      trending: 'down',
-      icon: ShoppingCart,
+      title: 'Actividades',
+      value: '156',
+      change: '+12%',
+      trending: 'up',
+      icon: Activity,
       color: 'bg-orange-500'
     },
     {
-      title: 'Tasa de Conversión',
-      value: '3.2%',
-      change: '+7%',
+      title: 'Eventos',
+      value: '24',
+      change: '+5%',
       trending: 'up',
-      icon: Activity,
+      icon: Calendar,
       color: 'bg-purple-500'
     }
   ];

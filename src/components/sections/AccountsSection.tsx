@@ -1,63 +1,48 @@
-import React, { useState } from 'react';
-import { Search, Filter, Plus, MoreVertical, Building2, TrendingUp, AlertCircle, Globe, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Plus, MoreVertical, Building2, TrendingUp, AlertCircle, Globe, Mail, X, Loader2, Edit, Trash2, Eye } from 'lucide-react';
 import { Institution } from '../../types';
+import { AccountService, CreateAccountRequest, UpdateAccountRequest } from '../../services/accountService';
+import { Account } from '../../config/api';
+import { ImageUpload } from '../ImageUpload';
+import { config } from '../../config/env';
+import { UploadService } from '../../services/uploadService';
+
+interface InstitutionFormData {
+  nombre: string;
+  razonSocial: string;
+  address: string;
+  emailAdmin: string;
+  nombreAdmin: string;
+  logo: string;
+  activo: boolean;
+}
 
 export const AccountsSection: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
+  const [formData, setFormData] = useState<InstitutionFormData>({
+    nombre: '',
+    razonSocial: '',
+    address: '',
+    emailAdmin: '',
+    nombreAdmin: '',
+    logo: '',
+    activo: true
+  });
 
-  const institutions: Institution[] = [
-    {
-      id: '1',
-      nombre: 'Universidad Nacional de Colombia',
-      address: 'Carrera 30 No 45-03, Edificio 477',
-      emailadmin: 'admin@unal.edu.co',
-      logo: 'https://via.placeholder.com/40',
-      status: 'active',
-      cuidad: 'Bogotá',
-      pais: 'Colombia'
-    },
-    {
-      id: '2',
-      nombre: 'Instituto Tecnológico de Monterrey',
-      address: 'Av. Eugenio Garza Sada 2501 Sur',
-      emailadmin: 'admin@tec.mx',
-      logo: 'https://via.placeholder.com/40',
-      status: 'active',
-      cuidad: 'Monterrey',
-      pais: 'México'
-    },
-    {
-      id: '3',
-      nombre: 'Universidad de Buenos Aires',
-      address: 'Viamonte 430, C1053 CABA',
-      emailadmin: 'admin@uba.ar',
-      logo: 'https://via.placeholder.com/40',
-      status: 'pending',
-      cuidad: 'Buenos Aires',
-      pais: 'Argentina'
-    },
-    {
-      id: '4',
-      nombre: 'Universidad de Chile',
-      address: 'Av. Libertador Bernardo O\'Higgins 1058',
-      emailadmin: 'admin@uchile.cl',
-      logo: 'https://via.placeholder.com/40',
-      status: 'inactive',
-      cuidad: 'Santiago',
-      pais: 'Chile'
-    },
-    {
-      id: '5',
-      nombre: 'Pontificia Universidad Javeriana',
-      address: 'Carrera 7 No 40-62',
-      emailadmin: 'admin@javeriana.edu.co',
-      logo: 'https://via.placeholder.com/40',
-      status: 'active',
-      cuidad: 'Bogotá',
-      pais: 'Colombia'
-    }
-  ];
+  const [currentImageKey, setCurrentImageKey] = useState<string>('');
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>('');
+
+  const [institutions, setInstitutions] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAccounts, setTotalAccounts] = useState(0);
 
   const getStatusColor = (status: Institution['status']) => {
     switch (status) {
@@ -80,18 +65,203 @@ export const AccountsSection: React.FC = () => {
   const filteredInstitutions = institutions.filter(institution => {
     const matchesSearch = 
       institution.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      institution.cuidad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      institution.pais.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || institution.status === filterStatus;
+      institution.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      institution.usuarioAdministrador.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterStatus === 'all' || (institution.activo ? 'active' : 'inactive') === filterStatus;
     return matchesSearch && matchesFilter;
   });
 
-  const totalInstitutions = institutions.length;
-  const activeInstitutions = institutions.filter(inst => inst.status === 'active').length;
-  const pendingInstitutions = institutions.filter(inst => inst.status === 'pending').length;
+  // Cargar datos de la API
+  useEffect(() => {
+    const loadAccounts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await AccountService.getAccounts(currentPage, 10);
+        setInstitutions(response.accounts);
+        setTotalAccounts(response.total);
+        setTotalPages(Math.ceil(response.total / 10));
+      } catch (err: any) {
+        setError(err.message || 'Error al cargar las instituciones');
+        console.error('Error loading accounts:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAccounts();
+  }, [currentPage]);
+
+  const totalInstitutions = totalAccounts;
+  const activeInstitutions = institutions.filter(inst => inst.activo).length;
+  const pendingInstitutions = institutions.filter(inst => !inst.activo).length;
+
+  const openModal = (account?: Account) => {
+    if (account) {
+      setEditingAccount(account);
+      setFormData({
+        nombre: account.nombre,
+        razonSocial: account.razonSocial,
+        address: account.address,
+        emailAdmin: account.usuarioAdministrador.email || '',
+        nombreAdmin: account.usuarioAdministrador.name || '',
+        logo: account.logo || '',
+        activo: account.activo
+      });
+      
+      // Cargar imagen actual si existe
+      if (account.logo) {
+        setCurrentImageKey(account.logo);
+        // Usar la URL firmada si está disponible, sino construir la URL de S3
+        const logoUrl = account.logoSignedUrl || config.getS3ImageUrl(account.logo);
+        setCurrentImageUrl(logoUrl);
+      } else {
+        setCurrentImageKey('');
+        setCurrentImageUrl('');
+      }
+    } else {
+      setEditingAccount(null);
+      setFormData({
+        nombre: '',
+        razonSocial: '',
+        address: '',
+        emailAdmin: '',
+        nombreAdmin: '',
+        logo: '',
+        activo: true
+      });
+      setCurrentImageKey('');
+      setCurrentImageUrl('');
+    }
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingAccount(null);
+    setFormData({
+      nombre: '',
+      razonSocial: '',
+      address: '',
+      emailAdmin: '',
+      nombreAdmin: '',
+      logo: '',
+      activo: true
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingAccount) {
+        // Actualizar cuenta existente
+        const updateData: UpdateAccountRequest = {
+          nombre: formData.nombre,
+          razonSocial: formData.razonSocial,
+          address: formData.address,
+          emailAdmin: formData.emailAdmin,
+          nombreAdmin: formData.nombreAdmin,
+          logo: formData.logo,
+          activo: formData.activo
+        };
+        
+        await AccountService.updateAccount(editingAccount._id, updateData);
+        
+        // Si se subió una nueva imagen, actualizar el logo en S3
+        if (currentImageKey && currentImageKey !== editingAccount.logo) {
+          await UploadService.updateAccountLogo(editingAccount._id, currentImageKey);
+        }
+      } else {
+        // Crear nueva cuenta
+        const accountData: CreateAccountRequest = {
+          nombre: formData.nombre,
+          razonSocial: formData.razonSocial,
+          address: formData.address,
+          emailAdmin: formData.emailAdmin,
+          passwordAdmin: 'admin123', // Contraseña por defecto
+          nombreAdmin: formData.nombreAdmin,
+          logo: formData.logo
+        };
+        
+        const newAccount = await AccountService.createAccount(accountData);
+        
+        // Si se subió una imagen, actualizar el logo en S3
+        if (currentImageKey) {
+          await UploadService.updateAccountLogo(newAccount._id, currentImageKey);
+        }
+      }
+      
+      // Recargar datos
+      const response = await AccountService.getAccounts(currentPage, 10);
+      setInstitutions(response.accounts);
+      setTotalAccounts(response.total);
+      
+      closeModal();
+    } catch (err: any) {
+      console.error('Error saving account:', err);
+      setError(err.message || 'Error al guardar la institución');
+    }
+  };
+
+  const handleDelete = async (account: Account) => {
+    setDeletingAccount(account);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingAccount) return;
+    
+    try {
+      await AccountService.deleteAccount(deletingAccount._id);
+      
+      // Recargar datos
+      const response = await AccountService.getAccounts(currentPage, 10);
+      setInstitutions(response.accounts);
+      setTotalAccounts(response.total);
+      
+      setShowDeleteModal(false);
+      setDeletingAccount(null);
+    } catch (err: any) {
+      console.error('Error deleting account:', err);
+      setError(err.message || 'Error al eliminar la institución');
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageUpload = (imageKey: string, imageUrl: string) => {
+    setCurrentImageKey(imageKey);
+    setCurrentImageUrl(imageUrl);
+    setFormData(prev => ({
+      ...prev,
+      logo: imageKey
+    }));
+  };
 
   return (
     <div className="space-y-6">
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <span className="ml-2 text-gray-600">Cargando instituciones...</span>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-400 mr-2" />
+            <span className="text-red-800">{error}</span>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl p-6 shadow-sm">
@@ -161,7 +331,10 @@ export const AccountsSection: React.FC = () => {
             </div>
           </div>
 
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <button 
+            onClick={() => openModal()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
             <Plus className="w-4 h-4" />
             Nueva Institución
           </button>
@@ -196,19 +369,10 @@ export const AccountsSection: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredInstitutions.map((institution) => (
-                <tr key={institution.id} className="hover:bg-gray-50">
+                <tr key={institution._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <img 
-                        src={institution.logo} 
-                        alt={`Logo ${institution.nombre}`}
-                        className="w-10 h-10 rounded-lg object-cover mr-3"
-                      />
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {institution.nombre}
-                        </div>
-                      </div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {institution.nombre}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -219,27 +383,40 @@ export const AccountsSection: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center text-sm text-gray-900">
                       <Mail className="w-4 h-4 mr-2 text-gray-400" />
-                      {institution.emailadmin}
+                      {institution.usuarioAdministrador.email}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center text-sm text-gray-900">
                       <Globe className="w-4 h-4 mr-2 text-gray-400" />
                       <div>
-                        <div>{institution.cuidad}</div>
-                        <div className="text-xs text-gray-500">{institution.pais}</div>
+                        <div>{institution.razonSocial}</div>
+                        <div className="text-xs text-gray-500">Razón Social</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(institution.status)}`}>
-                      {getStatusText(institution.status)}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${institution.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {institution.activo ? 'Activa' : 'Inactiva'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end space-x-2">
+                      <button 
+                        onClick={() => openModal(institution)}
+                        className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(institution)}
+                        className="text-red-600 hover:text-red-800 p-1 rounded"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -259,6 +436,196 @@ export const AccountsSection: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {editingAccount ? 'Editar Institución' : 'Agregar Nueva Institución'}
+                </h3>
+                <button
+                  onClick={closeModal}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre de la Institución
+                  </label>
+                  <input
+                    type="text"
+                    name="nombre"
+                    value={formData.nombre}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Dirección
+                  </label>
+                  <textarea
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Razón Social
+                  </label>
+                  <input
+                    type="text"
+                    name="razonSocial"
+                    value={formData.razonSocial}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Administrador
+                  </label>
+                  <input
+                    type="email"
+                    name="emailAdmin"
+                    value={formData.emailAdmin}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre del Administrador
+                  </label>
+                  <input
+                    type="text"
+                    name="nombreAdmin"
+                    value={formData.nombreAdmin}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Logo de la Institución
+                  </label>
+                  <ImageUpload
+                    onImageUpload={handleImageUpload}
+                    currentImageUrl={currentImageUrl}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Estado
+                  </label>
+                  <select
+                    name="activo"
+                    value={formData.activo ? 'true' : 'false'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, activo: e.target.value === 'true' }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="true">Activa</option>
+                    <option value="false">Inactiva</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-3 justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    {editingAccount ? 'Actualizar Institución' : 'Agregar Institución'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Eliminación */}
+      {showDeleteModal && deletingAccount && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Confirmar Eliminación
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeletingAccount(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-gray-700">
+                  ¿Estás seguro de que quieres eliminar la institución <strong>{deletingAccount.nombre}</strong>?
+                </p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Esta acción no se puede deshacer.
+                </p>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeletingAccount(null);
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
