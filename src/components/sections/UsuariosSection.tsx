@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, MoreVertical, Users, UserCheck, UserX, X, Mail, User as UserIcon, Loader2, AlertCircle } from 'lucide-react';
 import { userService, User, UserFormData } from '../../services/userService';
+import { getRoleDisplayName } from '../../utils/roleTranslations';
 
 export const UsuariosSection: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,11 +29,11 @@ export const UsuariosSection: React.FC = () => {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'superadmin': return 'bg-purple-100 text-purple-800';
-      case 'adminaccount': return 'bg-blue-100 text-blue-800';
-      case 'coordinador': return 'bg-green-100 text-green-800';
-      case 'familyadmin': return 'bg-yellow-100 text-yellow-800';
-      case 'familyviewer': return 'bg-gray-100 text-gray-800';
+      case 'superadmin': return 'bg-red-100 text-red-800';
+      case 'adminaccount': return 'bg-orange-100 text-orange-800';
+      case 'coordinador': return 'bg-purple-100 text-purple-800';
+      case 'familyadmin': return 'bg-green-100 text-green-800';
+      case 'familyviewer': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -256,7 +257,7 @@ export const UsuariosSection: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role.nombre)}`}>
-                      {user.role.nombre}
+                      {getRoleDisplayName(user.role.nombre)}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
