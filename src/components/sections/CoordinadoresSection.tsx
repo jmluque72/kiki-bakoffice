@@ -28,7 +28,7 @@ import {
 } from '@mui/material';
 import { Upload, Download, Users } from 'lucide-react';
 import { AccountService } from '../../services/accountService';
-import { Account } from '../../config/api';
+import { Account, apiClient } from '../../config/api';
 
 interface Coordinador {
   _id: string;
@@ -83,19 +83,8 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
 
   const loadDivisions = useCallback(async (accountId: string) => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
-      
-      const response = await fetch(`${API_BASE_URL}/api/groups/account/${accountId}?activo=true`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setDivisions(result.data.grupos || []);
-      }
+      const response = await apiClient.get(`/api/groups/account/${accountId}?activo=true`);
+      setDivisions(response.data.data.grupos || []);
     } catch (error) {
       console.error('Error loading divisions:', error);
     }
@@ -104,28 +93,15 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
   const loadCoordinadores = useCallback(async () => {
     try {
       setLoading(true);
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
       
-      let url = `${API_BASE_URL}/api/coordinators`;
+      let url = `/api/coordinators`;
       if (selectedDivision) {
-        url = `${API_BASE_URL}/api/coordinators/by-division/${selectedDivision}`;
+        url = `/api/coordinators/by-division/${selectedDivision}`;
       }
       
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setCoordinadores(result.data.coordinadores || []);
-        setTotalPages(Math.ceil((result.data.coordinadores?.length || 0) / 10));
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Error al cargar coordinadores');
-      }
+      const response = await apiClient.get(url);
+      setCoordinadores(response.data.data.coordinadores || []);
+      setTotalPages(Math.ceil((response.data.data.coordinadores?.length || 0) / 10));
     } catch (error) {
       console.error('Error al cargar coordinadores:', error);
       setError('Error al cargar coordinadores');
@@ -151,24 +127,15 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
       // Para adminaccount, necesitamos obtener su cuenta y luego las divisiones
       const loadAdminAccountDivisions = async () => {
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-          const token = localStorage.getItem('kiki_token');
-          
           // Primero obtener las asociaciones del usuario para saber a qué cuenta pertenece
-          const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          const response = await apiClient.get(`/api/users/profile`);
 
-          if (response.ok) {
-            const userData = await response.json();
-            // Asumimos que adminaccount tiene una asociación activa
-            if (userData.associations && userData.associations.length > 0) {
-              const accountId = userData.associations[0].account._id;
-              setSelectedAccount(accountId); // Para referencia interna
-              await loadDivisions(accountId);
-            }
+          const userData = response.data;
+          // Asumimos que adminaccount tiene una asociación activa
+          if (userData.associations && userData.associations.length > 0) {
+            const accountId = userData.associations[0].account._id;
+            setSelectedAccount(accountId); // Para referencia interna
+            await loadDivisions(accountId);
           }
         } catch (error) {
           console.error('Error loading admin account divisions:', error);
@@ -209,34 +176,24 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
     try {
       console.log('🔄 Descargando plantilla...');
       
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
-      
-      const response = await fetch(`${API_BASE_URL}/api/coordinators/template`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await apiClient.get(`/api/coordinators/template`, {
+        responseType: 'blob'
       });
 
-      if (response.ok) {
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `plantilla_coordinadores_${selectedDivisionForUpload?.nombre || 'division'}.xlsx`;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        } else {
-          setError('Error: El archivo no es un Excel válido');
-        }
+      const contentType = response.headers['content-type'];
+      
+      if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+        const blob = new Blob([response.data], { type: contentType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `plantilla_coordinadores_${selectedDivisionForUpload?.nombre || 'division'}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       } else {
-        setError(`Error al descargar la plantilla: ${response.status}`);
+        setError('Error: El archivo no es un Excel válido');
       }
     } catch (error) {
       console.error('Error al descargar plantilla:', error);
@@ -252,18 +209,13 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
     formData.append('divisionId', selectedDivisionForUpload._id);
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
-      
-      const response = await fetch(`${API_BASE_URL}/api/coordinators/upload-excel`, {
-        method: 'POST',
-        body: formData,
+      const response = await apiClient.post(`/api/coordinators/upload-excel`, formData, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'multipart/form-data'
         }
       });
 
-      const result = await response.json();
+      const result = response.data;
 
       if (result.success) {
         alert(`Carga completada. ${result.data.success} coordinadores cargados exitosamente.`);

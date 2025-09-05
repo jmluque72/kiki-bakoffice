@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:3000/api';
+import { apiClient } from '../config/api';
 
 export interface Grupo {
   _id: string;
@@ -41,13 +39,6 @@ export interface UpdateGrupoRequest {
 }
 
 class GrupoService {
-  private getAuthHeaders() {
-    const token = localStorage.getItem('kiki_token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-  }
 
   async getGrupos(page: number = 1, limit: number = 10, search: string = '', cuentaId?: string): Promise<GruposResponse> {
     try {
@@ -57,9 +48,7 @@ class GrupoService {
       if (search) params.append('search', search);
       if (cuentaId) params.append('cuentaId', cuentaId);
 
-      const response = await axios.get(`${API_BASE_URL}/grupos?${params.toString()}`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.get(`/api/grupos?${params.toString()}`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching grupos:', error);
@@ -69,9 +58,7 @@ class GrupoService {
 
   async getGrupoById(id: string): Promise<Grupo> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/grupos/${id}`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.get(`/api/grupos/${id}`);
       return response.data.data.grupo;
     } catch (error) {
       console.error('Error fetching grupo:', error);
@@ -81,9 +68,7 @@ class GrupoService {
 
   async createGrupo(grupoData: CreateGrupoRequest): Promise<Grupo> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/grupos`, grupoData, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.post(`/api/grupos`, grupoData);
       return response.data.data.grupo;
     } catch (error) {
       console.error('Error creating grupo:', error);
@@ -93,9 +78,7 @@ class GrupoService {
 
   async updateGrupo(id: string, grupoData: UpdateGrupoRequest): Promise<Grupo> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/grupos/${id}`, grupoData, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.put(`/api/grupos/${id}`, grupoData);
       return response.data.data.grupo;
     } catch (error) {
       console.error('Error updating grupo:', error);
@@ -105,9 +88,7 @@ class GrupoService {
 
   async deleteGrupo(id: string): Promise<void> {
     try {
-      await axios.delete(`${API_BASE_URL}/grupos/${id}`, {
-        headers: this.getAuthHeaders()
-      });
+      await apiClient.delete(`/api/grupos/${id}`);
     } catch (error) {
       console.error('Error deleting grupo:', error);
       throw error;

@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:3000/api';
+import { apiClient } from '../config/api';
 
 export interface User {
   _id: string;
@@ -53,13 +51,6 @@ export interface DeleteUserResponse {
 }
 
 class UserService {
-  private getAuthHeaders() {
-    const token = localStorage.getItem('kiki_token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-  }
 
   async getUsers(page: number = 1, limit: number = 10, search: string = ''): Promise<UsersResponse> {
     try {
@@ -68,9 +59,7 @@ class UserService {
       if (limit) params.append('limit', limit.toString());
       if (search) params.append('search', search);
 
-      const response = await axios.get(`${API_BASE_URL}/users?${params.toString()}`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.get(`/api/users?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -80,9 +69,7 @@ class UserService {
 
   async createUser(userData: UserFormData): Promise<CreateUserResponse> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/users`, userData, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.post(`/api/users`, userData);
       return response.data;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -92,9 +79,7 @@ class UserService {
 
   async updateUser(userId: string, userData: Partial<UserFormData>): Promise<UpdateUserResponse> {
     try {
-      const response = await axios.put(`${API_BASE_URL}/users/${userId}`, userData, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.put(`/api/users/${userId}`, userData);
       return response.data;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -104,9 +89,7 @@ class UserService {
 
   async deleteUser(userId: string): Promise<DeleteUserResponse> {
     try {
-      const response = await axios.delete(`${API_BASE_URL}/users/${userId}`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.delete(`/api/users/${userId}`);
       return response.data;
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -116,9 +99,7 @@ class UserService {
 
   async getUserById(userId: string): Promise<User> {
     try {
-      const response = await axios.get(`${API_BASE_URL}/users/${userId}`, {
-        headers: this.getAuthHeaders()
-      });
+      const response = await apiClient.get(`/api/users/${userId}`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching user:', error);

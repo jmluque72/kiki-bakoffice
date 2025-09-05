@@ -31,7 +31,7 @@ import {
 import { GraduationCap, Upload, Users } from 'lucide-react';
 import { grupoService, Grupo, CreateGrupoRequest, UpdateGrupoRequest } from '../../services/grupoService';
 import { AccountService } from '../../services/accountService';
-import { Account } from '../../config/api';
+import { Account, apiClient } from '../../config/api';
 import { ConfirmationDialog } from '../ConfirmationDialog';
 
 interface GruposSectionProps {
@@ -187,19 +187,13 @@ const GruposSection = ({ userRole, onSectionChange }: GruposSectionProps) => {
     formData.append('divisionId', selectedGrupoForUpload._id);
 
     try {
-      // Usar la URL base del backend
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token'); // Usar el token correcto
-      
-      const response = await fetch(`${API_BASE_URL}/api/coordinators/upload-excel`, {
-        method: 'POST',
-        body: formData,
+      const response = await apiClient.post(`/api/coordinators/upload-excel`, formData, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'multipart/form-data'
         }
       });
 
-      const result = await response.json();
+      const result = response.data;
 
       if (result.success) {
         alert(`Carga completada. ${result.data.success} coordinadores cargados exitosamente.`);
@@ -219,51 +213,31 @@ const GruposSection = ({ userRole, onSectionChange }: GruposSectionProps) => {
     try {
       console.log('🔄 Descargando plantilla...');
       
-      // Usar la URL base del backend
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token'); // Usar el token correcto
-      
-      const response = await fetch(`${API_BASE_URL}/api/coordinators/template`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await apiClient.get(`/api/coordinators/template`, {
+        responseType: 'blob'
       });
 
-      console.log('📊 Response status:', response.status);
-      console.log('📊 Response headers:', response.headers);
-
-      if (response.ok) {
-        // Verificar el tipo de contenido
-        const contentType = response.headers.get('content-type');
-        console.log('📄 Content-Type:', contentType);
+      const contentType = response.headers['content-type'];
+      console.log('📄 Content-Type:', contentType);
+      
+      if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+        const blob = new Blob([response.data], { type: contentType });
+        console.log('📦 Blob creado:', blob.size, 'bytes');
         
-        if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
-          // Crear un blob del archivo
-          const blob = await response.blob();
-          console.log('📦 Blob creado:', blob.size, 'bytes');
-          
-          // Crear un enlace de descarga
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `plantilla_coordinadores_${selectedGrupoForUpload?.nombre || 'division'}.xlsx`;
-          document.body.appendChild(a);
-          a.click();
-          
-          // Limpiar
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-          
-          console.log('✅ Descarga completada');
-        } else {
-          console.error('❌ Content-Type incorrecto:', contentType);
-          setError('Error: El archivo no es un Excel válido');
-        }
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `plantilla_coordinadores_${selectedGrupoForUpload?.nombre || 'division'}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        console.log('✅ Descarga completada');
       } else {
-        const errorText = await response.text();
-        console.error('❌ Error response:', errorText);
-        setError(`Error al descargar la plantilla: ${response.status}`);
+        console.error('❌ Content-Type incorrecto:', contentType);
+        setError('Error: El archivo no es un Excel válido');
       }
     } catch (error) {
       console.error('❌ Error al descargar plantilla:', error);
@@ -276,25 +250,9 @@ const GruposSection = ({ userRole, onSectionChange }: GruposSectionProps) => {
       setLoadingCoordinators(true);
       setSelectedGrupoForCoordinators(grupo);
       
-      // Usar la URL base del backend
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
-      
-      const response = await fetch(`${API_BASE_URL}/api/coordinators/by-division/${grupo._id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setCoordinators(result.data.coordinadores);
-        setShowCoordinatorsDialog(true);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Error al cargar coordinadores');
-      }
+      const response = await apiClient.get(`/api/coordinators/by-division/${grupo._id}`);
+      setCoordinators(response.data.data.coordinadores);
+      setShowCoordinatorsDialog(true);
     } catch (error) {
       console.error('Error al cargar coordinadores:', error);
       setError('Error al cargar coordinadores');

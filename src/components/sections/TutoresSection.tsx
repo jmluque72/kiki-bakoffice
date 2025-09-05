@@ -28,7 +28,7 @@ import {
 } from '@mui/material';
 import { Upload, Download, Users } from 'lucide-react';
 import { AccountService } from '../../services/accountService';
-import { Account } from '../../config/api';
+import { Account, apiClient } from '../../config/api';
 
 interface Tutor {
   _id: string;
@@ -85,19 +85,8 @@ const TutoresSection = ({ userRole }: TutoresSectionProps) => {
 
   const loadDivisions = useCallback(async (accountId: string) => {
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
-      
-      const response = await fetch(`${API_BASE_URL}/api/groups/account/${accountId}?activo=true`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setDivisions(result.data.grupos || []);
-      }
+      const response = await apiClient.get(`/api/groups/account/${accountId}?activo=true`);
+      setDivisions(response.data.data.grupos || []);
     } catch (error) {
       console.error('Error loading divisions:', error);
     }
@@ -106,28 +95,15 @@ const TutoresSection = ({ userRole }: TutoresSectionProps) => {
   const loadTutores = useCallback(async () => {
     try {
       setLoading(true);
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const token = localStorage.getItem('kiki_token');
       
-      let url = `${API_BASE_URL}/api/tutors`;
+      let url = `/api/tutors`;
       if (selectedDivision) {
-        url = `${API_BASE_URL}/api/tutors/by-division/${selectedDivision}`;
+        url = `/api/tutors/by-division/${selectedDivision}`;
       }
       
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setTutores(result.data.tutores || []);
-        setTotalPages(Math.ceil((result.data.tutores?.length || 0) / 10));
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Error al cargar tutores');
-      }
+      const response = await apiClient.get(url);
+      setTutores(response.data.data.tutores || []);
+      setTotalPages(Math.ceil((response.data.data.tutores?.length || 0) / 10));
     } catch (error) {
       console.error('Error al cargar tutores:', error);
       setError('Error al cargar tutores');
@@ -153,24 +129,15 @@ const TutoresSection = ({ userRole }: TutoresSectionProps) => {
       // Para adminaccount, necesitamos obtener su cuenta y luego las divisiones
       const loadAdminAccountDivisions = async () => {
         try {
-          const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-          const token = localStorage.getItem('kiki_token');
-          
           // Primero obtener las asociaciones del usuario para saber a qué cuenta pertenece
-          const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          const response = await apiClient.get(`/api/users/profile`);
 
-          if (response.ok) {
-            const userData = await response.json();
-            // Asumimos que adminaccount tiene una asociación activa
-            if (userData.associations && userData.associations.length > 0) {
-              const accountId = userData.associations[0].account._id;
-              setSelectedAccount(accountId); // Para referencia interna
-              await loadDivisions(accountId);
-            }
+          const userData = response.data;
+          // Asumimos que adminaccount tiene una asociación activa
+          if (userData.associations && userData.associations.length > 0) {
+            const accountId = userData.associations[0].account._id;
+            setSelectedAccount(accountId); // Para referencia interna
+            await loadDivisions(accountId);
           }
         } catch (error) {
           console.error('Error loading admin account divisions:', error);
