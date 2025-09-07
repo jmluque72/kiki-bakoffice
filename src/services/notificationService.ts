@@ -162,4 +162,53 @@ export class NotificationService {
       throw new Error(error.response?.data?.message || 'Error al obtener destinatarios');
     }
   }
+
+  // Obtener notificaciones para usuarios familyadmin/familyviewer
+  static async getUserNotifications(params?: {
+    limit?: number;
+    skip?: number;
+    accountId?: string;
+    divisionId?: string;
+    unreadOnly?: boolean;
+  }): Promise<Notification[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.skip) queryParams.append('skip', params.skip.toString());
+      if (params?.accountId) queryParams.append('accountId', params.accountId);
+      if (params?.divisionId) queryParams.append('divisionId', params.divisionId);
+      if (params?.unreadOnly) queryParams.append('unreadOnly', params.unreadOnly.toString());
+
+      const response = await apiClient.get<ApiResponse<Notification[]>>(
+        `/api/notifications?${queryParams.toString()}`
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      } else {
+        return [];
+      }
+    } catch (error: any) {
+      console.error('Error al obtener notificaciones del usuario:', error);
+      return [];
+    }
+  }
+
+  // Obtener conteo de notificaciones sin leer
+  static async getUnreadCount(): Promise<number> {
+    try {
+      const response = await apiClient.get<ApiResponse<{ count: number }>>(
+        '/api/notifications/unread-count'
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data.count;
+      } else {
+        return 0;
+      }
+    } catch (error: any) {
+      console.error('Error al obtener conteo de notificaciones sin leer:', error);
+      return 0;
+    }
+  }
 }

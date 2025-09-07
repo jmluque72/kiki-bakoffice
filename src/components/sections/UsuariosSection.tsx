@@ -49,14 +49,9 @@ export const UsuariosSection: React.FC = () => {
   const inactiveUsers = users.filter(user => !user.activo).length;
 
   const openModal = () => {
-    setFormData({
-      name: '',
-      email: '',
-      role: 'user',
-      status: 'active',
-      avatar: ''
-    });
-    setShowModal(true);
+    // Modal desactivado - Los usuarios se crean por Excel o app móvil
+    console.log('Creación de usuarios desactivada - Los usuarios se crean mediante carga de Excel o desde la app móvil');
+    return;
   };
 
   const closeModal = () => {
@@ -167,14 +162,40 @@ export const UsuariosSection: React.FC = () => {
         </div>
       )}
 
+      {/* Info Message */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center">
+          <div className="p-2 bg-blue-100 rounded-lg mr-3">
+            <Users className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-medium text-blue-800">Creación de Usuarios</h3>
+            <p className="text-sm text-blue-700 mt-1">
+              Los usuarios se crean automáticamente mediante:
+            </p>
+            <ul className="text-sm text-blue-700 mt-2 ml-4 list-disc">
+              <li>Carga de archivos Excel (estudiantes, coordinadores)</li>
+              <li>Registro desde la aplicación móvil</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="p-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h2 className="text-lg font-semibold text-gray-900">Gestión de Usuarios</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Gestión de Usuarios</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Los usuarios se crean automáticamente mediante carga de Excel o desde la app móvil
+              </p>
+            </div>
+            {/* Botón desactivado - Los usuarios se crean por Excel o app móvil */}
             <button 
-              onClick={openModal}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              disabled
+              className="bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed flex items-center gap-2"
+              title="Los usuarios se crean mediante carga de Excel o desde la app móvil"
             >
               <Plus className="w-4 h-4" />
               Nuevo Usuario

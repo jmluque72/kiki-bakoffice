@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, Users, Download, Trash2, Plus, Search, Filter, Eye } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Upload, Users, Download, Trash2, Plus, Search, Filter, Eye, QrCode, Printer } from 'lucide-react';
 import { apiClient } from '../../config/api';
 import { Notification } from '../Notification';
 import { ConfirmationDialog } from '../ConfirmationDialog';
 import * as XLSX from 'xlsx';
 import { getRoleDisplayName } from '../../utils/roleTranslations';
+import QRCode from 'qrcode';
+import { useReactToPrint } from 'react-to-print';
+import '../../styles/print.css';
 
 interface Student {
   _id: string;
@@ -13,6 +16,7 @@ interface Student {
   email: string;
   dni: string;
   year: number;
+  qrCode?: string;
   account: {
     _id: string;
     nombre: string;
@@ -75,6 +79,17 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentAssociations, setStudentAssociations] = useState<any[]>([]);
   const [loadingAssociations, setLoadingAssociations] = useState(false);
+  
+  // Estado para el modal de código QR
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedStudentQR, setSelectedStudentQR] = useState<Student | null>(null);
+  const [qrCode, setQrCode] = useState<string>('');
+  const [generatingQR, setGeneratingQR] = useState(false);
+  const [qrCodeImage, setQrCodeImage] = useState<string>('');
+  const [generatingQRImage, setGeneratingQRImage] = useState(false);
+  
+  // Referencia para la impresión
+  const printRef = useRef<HTMLDivElement>(null);
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
 
@@ -128,6 +143,76 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
       deleteStudent(studentToDelete._id);
     }
   };
+
+  // Generar códigos QR para todos los estudiantes
+  const generateQRCodes = async () => {
+    if (!currentAccount?._id || !currentDivision?._id) {
+      Notification.error('Debe seleccionar una cuenta y división');
+      return;
+    }
+
+    setGeneratingQR(true);
+    try {
+      const response = await apiClient.post('/api/students/generate-qr-codes', {
+        accountId: currentAccount._id,
+        divisionId: currentDivision._id
+      });
+
+      if (response.data.success) {
+        const { generatedCount, totalProcessed } = response.data.data;
+        Notification.success(`Se generaron ${generatedCount} códigos QR de ${totalProcessed} estudiantes procesados`);
+        loadStudents(); // Recargar la lista
+      }
+    } catch (error) {
+      console.error('Error generando códigos QR:', error);
+      Notification.error('Error al generar códigos QR');
+    } finally {
+      setGeneratingQR(false);
+    }
+  };
+
+  // Mostrar código QR de un estudiante
+  const handleShowQR = async (student: Student) => {
+    setSelectedStudentQR(student);
+    setQrCode(student.qrCode || '');
+    setShowQRModal(true);
+    
+    // Generar imagen del código QR si existe
+    if (student.qrCode) {
+      setGeneratingQRImage(true);
+      try {
+        const qrImage = await QRCode.toDataURL(student.qrCode, {
+          width: 200,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        setQrCodeImage(qrImage);
+      } catch (error) {
+        console.error('Error generando imagen QR:', error);
+        setQrCodeImage('');
+      } finally {
+        setGeneratingQRImage(false);
+      }
+    } else {
+      setQrCodeImage('');
+    }
+  };
+
+  // Función de impresión
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    documentTitle: `QR_${selectedStudentQR?.nombre}_${selectedStudentQR?.apellido}`,
+    onAfterPrint: () => {
+      Notification.success('Código QR enviado a impresión');
+    },
+    onPrintError: (error) => {
+      console.error('Error de impresión:', error);
+      Notification.error('Error al imprimir el código QR');
+    }
+  });
 
   // Cargar vinculaciones de un estudiante
   const loadStudentAssociations = async (studentId: string) => {
@@ -334,6 +419,15 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
           </button>
           
           <button
+            onClick={generateQRCodes}
+            disabled={generatingQR}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            <QrCode className="h-4 w-4 mr-2" />
+            {generatingQR ? 'Generando...' : 'Generar QR'}
+          </button>
+          
+          <button
             onClick={() => setShowUploadModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
@@ -473,6 +567,14 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => handleShowQR(student)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Ver código QR"
+                          disabled={!student.qrCode}
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handleViewAssociations(student)}
                           className="text-blue-600 hover:text-blue-900"
@@ -788,6 +890,149 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
            </div>
          </div>
        )}
+
+       {/* Modal de Código QR */}
+       {showQRModal && selectedStudentQR && (
+         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+           <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+             <div className="mt-3">
+               <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-lg font-medium text-gray-900">
+                   Código QR - {selectedStudentQR.nombre} {selectedStudentQR.apellido}
+                 </h3>
+                 <button
+                   onClick={() => setShowQRModal(false)}
+                   className="text-gray-400 hover:text-gray-600"
+                 >
+                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                   </svg>
+                 </button>
+               </div>
+               
+               {qrCode ? (
+                 <div className="text-center">
+                   <div className="mb-4">
+                     <div className="inline-block p-4 bg-white border-2 border-gray-200 rounded-lg">
+                       {generatingQRImage ? (
+                         <div className="w-48 h-48 bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                           <div className="text-center">
+                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-2"></div>
+                             <p className="text-sm text-gray-500">Generando QR...</p>
+                           </div>
+                         </div>
+                       ) : qrCodeImage ? (
+                         <img 
+                           src={qrCodeImage} 
+                           alt="Código QR" 
+                           className="w-48 h-48 mx-auto"
+                         />
+                       ) : (
+                         <div className="w-48 h-48 bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
+                           <div className="text-center">
+                             <QrCode className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                             <p className="text-sm text-gray-500">Error generando QR</p>
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                   
+                   <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                     <p className="text-sm text-gray-600 mb-2">
+                       <strong>Estudiante:</strong> {selectedStudentQR.nombre} {selectedStudentQR.apellido}
+                     </p>
+                     <p className="text-sm text-gray-600 mb-2">
+                       <strong>DNI:</strong> {selectedStudentQR.dni}
+                     </p>
+                     <p className="text-sm text-gray-600">
+                       <strong>División:</strong> {selectedStudentQR.division?.nombre}
+                     </p>
+                   </div>
+                   
+                   <div className="flex space-x-2">
+                     <button
+                       onClick={() => {
+                         navigator.clipboard.writeText(qrCode);
+                         Notification.success('Código copiado al portapapeles');
+                       }}
+                       className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                     >
+                       Copiar
+                     </button>
+                     <button
+                       onClick={handlePrint}
+                       disabled={!qrCodeImage}
+                       className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                     >
+                       <Printer className="h-4 w-4 mr-1" />
+                       Imprimir
+                     </button>
+                     <button
+                       onClick={() => setShowQRModal(false)}
+                       className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700"
+                     >
+                       Cerrar
+                     </button>
+                   </div>
+                 </div>
+               ) : (
+                 <div className="text-center py-8">
+                   <QrCode className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                   <h3 className="text-sm font-medium text-gray-900 mb-2">Sin código QR</h3>
+                   <p className="text-sm text-gray-500 mb-4">
+                     Este estudiante no tiene un código QR generado.
+                   </p>
+                   <button
+                     onClick={() => setShowQRModal(false)}
+                     className="px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700"
+                   >
+                     Cerrar
+                   </button>
+                 </div>
+               )}
+             </div>
+           </div>
+         </div>
+       )}
+
+       {/* Componente para impresión (oculto) */}
+       <div style={{ display: 'none' }}>
+         <div ref={printRef} className="print-content">
+           {selectedStudentQR && qrCodeImage && (
+             <div className="p-8 text-center">
+               <div className="mb-6">
+                 <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                   Código QR de Asistencia
+                 </h1>
+                 <h2 className="text-xl text-gray-700">
+                   {selectedStudentQR.nombre} {selectedStudentQR.apellido}
+                 </h2>
+               </div>
+               
+               <div className="mb-6">
+                 <img 
+                   src={qrCodeImage} 
+                   alt="Código QR" 
+                   className="w-64 h-64 mx-auto border-2 border-gray-300"
+                 />
+               </div>
+               
+               <div className="text-sm text-gray-600 space-y-1">
+                 <p><strong>DNI:</strong> {selectedStudentQR.dni}</p>
+                 <p><strong>División:</strong> {selectedStudentQR.division?.nombre}</p>
+                 <p><strong>Institución:</strong> {selectedStudentQR.account?.nombre}</p>
+                 <p><strong>Código:</strong> {qrCode}</p>
+               </div>
+               
+               <div className="mt-8 text-xs text-gray-500">
+                 <p>Imprima este código QR y péguelo en el cuaderno del estudiante</p>
+                 <p>Para marcar asistencia, escanee este código con la app móvil</p>
+               </div>
+             </div>
+           )}
+         </div>
+       </div>
      </div>
    );
  }; 

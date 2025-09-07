@@ -79,6 +79,7 @@ export const Dashboard: React.FC = () => {
         <Header 
           onMenuClick={() => setSidebarOpen(true)} 
           currentSection={activeSection}
+          onNotificationClick={() => setActiveSection('notificaciones')}
         />
         <main className="flex-1 p-6">
           {renderContent()}

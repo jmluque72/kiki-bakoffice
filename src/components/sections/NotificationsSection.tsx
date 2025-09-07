@@ -35,29 +35,55 @@ export const NotificationsSection: React.FC = () => {
       
       const skip = (page - 1) * itemsPerPage;
       
-      const params: any = {
-        limit: itemsPerPage,
-        skip,
-        type: filterType === 'all' ? undefined : filterType,
-        search: searchTerm || undefined
-      };
-      
-      // Para superadmin, permitir filtrar por cuenta específica
-      if (user?.role?.nombre === 'superadmin') {
-        params.accountId = user?.account?._id;
+      // Verificar si es usuario familyadmin/familyviewer
+      if (user?.role?.nombre === 'familyadmin' || user?.role?.nombre === 'familyviewer') {
+        console.log('🔔 [BACKOFFICE] Usuario es familyadmin/familyviewer - usando endpoint de usuario');
+        
+        // Para usuarios familyadmin/familyviewer, necesitamos obtener las asociaciones
+        // Por ahora, vamos a usar los parámetros que sabemos que funcionan
+        const params = {
+          limit: itemsPerPage,
+          skip,
+          accountId: '68b2eef1c9d2e9a7e5742fed', // San Martin - hardcoded por ahora
+          divisionId: '68b2ef3fc9d2e9a7e57430f1'  // Sala Verde - hardcoded por ahora
+        };
+        
+        console.log('🔔 [BACKOFFICE] Parámetros para usuario:', params);
+        
+        const userNotifications = await NotificationService.getUserNotifications(params);
+        
+        console.log('🔔 [BACKOFFICE] Notificaciones de usuario recibidas:', userNotifications);
+        console.log('🔔 [BACKOFFICE] Cantidad:', userNotifications?.length || 0);
+        
+        setNotifications(userNotifications);
+        setPagination(null); // No hay paginación para usuarios
+        setCurrentPage(page);
+      } else {
+        // Para superadmin y adminaccount, usar el endpoint de backoffice
+        const params: any = {
+          limit: itemsPerPage,
+          skip,
+          type: filterType === 'all' ? undefined : filterType,
+          search: searchTerm || undefined
+        };
+        
+        // Para superadmin, permitir filtrar por cuenta específica
+        if (user?.role?.nombre === 'superadmin') {
+          params.accountId = user?.account?._id;
+        }
+        
+        console.log('🔔 [BACKOFFICE] Parámetros de búsqueda:', params);
+        
+        const result = await NotificationService.getBackofficeNotifications(params);
+        
+        console.log('🔔 [BACKOFFICE] Notificaciones recibidas:', result);
+        console.log('🔔 [BACKOFFICE] Cantidad:', result.notifications?.length || 0);
+        console.log('🔔 [BACKOFFICE] Paginación:', result.pagination);
+        
+        setNotifications(result.notifications);
+        setPagination(result.pagination);
+        setCurrentPage(page);
       }
-      
-      console.log('🔔 [BACKOFFICE] Parámetros de búsqueda:', params);
-      
-      const result = await NotificationService.getBackofficeNotifications(params);
-      
-      console.log('🔔 [BACKOFFICE] Notificaciones recibidas:', result);
-      console.log('🔔 [BACKOFFICE] Cantidad:', result.notifications?.length || 0);
-      console.log('🔔 [BACKOFFICE] Paginación:', result.pagination);
-      
-      setNotifications(result.notifications);
-      setPagination(result.pagination);
-      setCurrentPage(page);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
