@@ -1,8 +1,10 @@
-import React from 'react';
-import { Menu, Bell, User } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Menu, Bell, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useNotificationCount } from '../hooks/useNotificationCount';
 import { ApiStatus } from './ApiStatus';
+import { getRoleDisplayName, getRoleColor } from '../utils/roleTranslations';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -11,8 +13,25 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection, onNotificationClick }) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { unreadCount, shouldShowNotifications } = useNotificationCount();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const getSectionTitle = (section: string) => {
     const titles: { [key: string]: string } = {
@@ -57,12 +76,53 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection, onN
           
           <ApiStatus />
           
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg">
-            <User className="w-5 h-5 text-gray-600" />
-            <span className="text-sm font-medium text-gray-900">{user?.nombre}</span>
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <User className="w-5 h-5 text-gray-600" />
+              <div className="flex flex-col text-left">
+                <span className="text-sm font-medium text-gray-900">{user?.name}</span>
+                <span className={`text-xs px-2 py-1 rounded-full ${getRoleColor(user?.role?.nombre || '')}`}>
+                  {user?.role?.nombre || 'Sin rol'}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <button
+                  onClick={() => {
+                    setShowChangePassword(true);
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4" />
+                  Cambiar Contraseña
+                </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar Sesión
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </header>
   );
 };

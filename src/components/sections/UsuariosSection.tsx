@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, MoreVertical, Users, UserCheck, UserX, X, Mail, User as UserIcon, Loader2, AlertCircle } from 'lucide-react';
 import { userService, User, UserFormData } from '../../services/userService';
 import { getRoleDisplayName } from '../../utils/roleTranslations';
+import { useAuth } from '../../hooks/useAuth';
 
 export const UsuariosSection: React.FC = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [showModal, setShowModal] = useState(false);

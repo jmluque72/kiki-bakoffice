@@ -4,7 +4,7 @@ export interface Notification {
   _id: string;
   title: string;
   message: string;
-  type: 'informacion' | 'comunicacion';
+  type: 'informacion' | 'comunicacion' | 'institucion';
   sender: {
     _id: string;
     nombre: string;
@@ -52,7 +52,7 @@ export interface NotificationResponse {
 export interface CreateNotificationRequest {
   title: string;
   message: string;
-  type: 'informacion' | 'comunicacion';
+  type: 'informacion' | 'comunicacion' | 'institucion';
   accountId: string;
   divisionId?: string;
   recipients?: string[];

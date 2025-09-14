@@ -76,6 +76,44 @@ export interface UpdateAsistenciaRequest {
 }
 
 export class AsistenciaService {
+  // Obtener datos del calendario (solo fechas con asistencias)
+  static async getCalendarData(params: {
+    grupoId: string;
+    fechaInicio: string;
+    fechaFin: string;
+  }): Promise<{ [fecha: string]: { fecha: string; totalEstudiantes: number; presentes: number; ausentes: number } }> {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('grupoId', params.grupoId);
+      queryParams.append('fechaInicio', params.fechaInicio);
+      queryParams.append('fechaFin', params.fechaFin);
+
+      const response = await apiClient.get<ApiResponse<{ [fecha: string]: any }>>(
+        `/backoffice/asistencias/calendar?${queryParams.toString()}`
+      );
+      
+      return response.data.data!;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener datos del calendario');
+    }
+  }
+
+  // Obtener asistencias detalladas para un día específico
+  static async getDayAsistencias(fecha: string, grupoId: string): Promise<Asistencia[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('grupoId', grupoId);
+
+      const response = await apiClient.get<ApiResponse<Asistencia[]>>(
+        `/backoffice/asistencias/day/${fecha}?${queryParams.toString()}`
+      );
+      
+      return response.data.data!;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener asistencias del día');
+    }
+  }
+
   // Obtener asistencias del backoffice con paginación
   static async getBackofficeAsistencias(params?: {
     page?: number;

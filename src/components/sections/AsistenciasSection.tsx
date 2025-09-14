@@ -12,150 +12,83 @@ import {
   Download,
   Eye,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Building2,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { useBackofficeAsistencias, AsistenciaFilters } from '../../hooks/useBackofficeAsistencias';
 import { useAuth } from '../../hooks/useAuth';
+import { useDivisions } from '../../hooks/useDivisions';
 import { Notification } from '../Notification';
+import { AttendanceCalendar } from '../AttendanceCalendar';
+import { AttendanceDayModal } from '../AttendanceDayModal';
+import { Asistencia } from '../../services/asistenciaService';
 
 export const AsistenciasSection: React.FC = () => {
   const { user } = useAuth();
-  const {
-    asistencias,
-    pagination,
-    loading,
-    error,
-    currentPage,
-    itemsPerPage,
-    loadAsistencias,
-    createAsistencia,
-    updateAsistencia,
-    deleteAsistencia,
-    handlePageChange,
-    handleNextPage,
-    handlePrevPage,
-    exportAsistencias,
-    getStats,
-    clearError
-  } = useBackofficeAsistencias();
+  const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
 
-  const [filters, setFilters] = useState<AsistenciaFilters>({});
-  const [searchTerm, setSearchTerm] = useState('');
+  console.log('📊 [ASISTENCIAS] Componente renderizado');
+  console.log('📊 [ASISTENCIAS] User:', user);
+  console.log('📊 [ASISTENCIAS] Divisions:', divisions);
+  console.log('📊 [ASISTENCIAS] Divisions loading:', divisionsLoading);
+  console.log('📊 [ASISTENCIAS] Divisions error:', divisionsError);
+  
+  const [selectedDivision, setSelectedDivision] = useState<string>('');
+  const [showDayModal, setShowDayModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDayAsistencias, setSelectedDayAsistencias] = useState<Asistencia[]>([]);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState<'success' | 'error'>('success');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedAsistencia, setSelectedAsistencia] = useState<any>(null);
 
-  const handleFilterChange = (key: keyof AsistenciaFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  // Manejar selección de división
+  const handleDivisionChange = (divisionId: string) => {
+    setSelectedDivision(divisionId);
   };
 
-  const handleApplyFilters = () => {
-    loadAsistencias(1, { ...filters, search: searchTerm });
+  // Manejar click en un día del calendario
+  const handleDateClick = (date: string, asistencias: Asistencia[]) => {
+    console.log('📊 [ASISTENCIAS] handleDateClick llamado');
+    console.log('📊 [ASISTENCIAS] Fecha:', date);
+    console.log('📊 [ASISTENCIAS] Asistencias recibidas:', asistencias);
+    console.log('📊 [ASISTENCIAS] Cantidad de asistencias:', asistencias.length);
+    
+    setSelectedDate(date);
+    setSelectedDayAsistencias(asistencias);
+    setShowDayModal(true);
+    
+    console.log('📊 [ASISTENCIAS] Modal abierto:', true);
   };
 
-  const handleClearFilters = () => {
-    setFilters({});
-    setSearchTerm('');
-    loadAsistencias(1);
+  // Cerrar modal del día
+  const handleCloseDayModal = () => {
+    setShowDayModal(false);
+    setSelectedDate('');
+    setSelectedDayAsistencias([]);
   };
 
-  const handleSearch = () => {
-    loadAsistencias(1, { ...filters, search: searchTerm });
+  // Cerrar notificación
+  const handleCloseNotification = () => {
+    setShowNotification(false);
   };
 
-  const handleCreateAsistencia = async (asistenciaData: any) => {
-    const result = await createAsistencia(asistenciaData);
-    setNotificationType(result.success ? 'success' : 'error');
-    setNotificationMessage(result.message);
-    setShowNotification(true);
-    if (result.success) {
-      setShowCreateModal(false);
-    }
-  };
+  // No seleccionar automáticamente, dejar que el usuario elija
 
-  const handleUpdateAsistencia = async (asistenciaId: string, updateData: any) => {
-    const result = await updateAsistencia(asistenciaId, updateData);
-    setNotificationType(result.success ? 'success' : 'error');
-    setNotificationMessage(result.message);
-    setShowNotification(true);
-    if (result.success) {
-      setShowEditModal(false);
-      setSelectedAsistencia(null);
-    }
-  };
-
-  const handleDeleteAsistencia = async (asistenciaId: string) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta asistencia?')) {
-      const result = await deleteAsistencia(asistenciaId);
-      setNotificationType(result.success ? 'success' : 'error');
-      setNotificationMessage(result.message);
-      setShowNotification(true);
-    }
-  };
-
-  const handleExport = async () => {
-    const result = await exportAsistencias({ ...filters, search: searchTerm });
-    setNotificationType(result.success ? 'success' : 'error');
-    setNotificationMessage(result.message);
-    setShowNotification(true);
-  };
-
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case 'presente':
-        return 'bg-green-100 text-green-800';
-      case 'ausente':
-        return 'bg-red-100 text-red-800';
-      case 'justificado':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'tardanza':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    // El campo fecha es String en formato YYYY-MM-DD
-    if (dateString && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      const [year, month, day] = dateString.split('-');
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-      return date.toLocaleDateString('es-ES', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    }
-    // Si no es un formato válido, mostrar la original
-    return dateString || 'Fecha inválida';
-  };
-
-  const formatTime = (timeString?: string) => {
-    if (!timeString) return '-';
-    return new Date(timeString).toLocaleTimeString('es-ES', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Limpiar error cuando se cierre la notificación
-  useEffect(() => {
-    if (showNotification) {
-      const timer = setTimeout(() => {
-        setShowNotification(false);
-        clearError();
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [showNotification, clearError]);
-
-  if (loading) {
+  // Si no hay usuario, mostrar mensaje
+  if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Cargando usuario...
+          </h3>
+          <p className="text-gray-500">
+            Por favor espera mientras se carga la información.
+          </p>
+        </div>
       </div>
     );
   }
@@ -168,311 +101,94 @@ export const AsistenciasSection: React.FC = () => {
           <Users className="h-8 w-8 text-blue-600" />
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Asistencias</h2>
-            <p className="text-gray-600">Gestiona las asistencias de los alumnos</p>
+            <p className="text-gray-600">Registro y consulta de asistencias por división</p>
           </div>
-        </div>
-        <div className="flex space-x-3">
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nueva Asistencia</span>
-          </button>
-          <button 
-            onClick={handleExport}
-            className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            <span>Exportar</span>
-          </button>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Cuenta
-            </label>
-            <select
-              value={filters.accountId || ''}
-              onChange={(e) => handleFilterChange('accountId', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todas las cuentas</option>
-              {/* Aquí se cargarían las cuentas disponibles */}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Grupo
-            </label>
-            <select
-              value={filters.grupoId || ''}
-              onChange={(e) => handleFilterChange('grupoId', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Todos los grupos</option>
-              {/* Aquí se cargarían los grupos disponibles */}
-            </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha Inicio
-            </label>
-            <input
-              type="date"
-              value={filters.fechaInicio || ''}
-              onChange={(e) => handleFilterChange('fechaInicio', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fecha Fin
-            </label>
-            <input
-              type="date"
-              value={filters.fechaFin || ''}
-              onChange={(e) => handleFilterChange('fechaFin', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-        
-        <div className="flex justify-between items-center mt-4">
-          <div className="flex space-x-3">
-            <button
-              onClick={handleApplyFilters}
-              className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Filter className="h-4 w-4" />
-              <span>Aplicar Filtros</span>
-            </button>
-            <button
-              onClick={handleClearFilters}
-              className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <span>Limpiar</span>
-            </button>
-          </div>
-          
+      {/* Error de divisiones */}
+      {divisionsError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar asistencias..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={handleSearch}
-              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Buscar
-            </button>
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <p className="text-red-700">{divisionsError}</p>
           </div>
         </div>
+      )}
+
+      {/* Selector de División */}
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Building2 className="h-5 w-5 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Seleccionar División</h3>
+        </div>
+        
+        {divisionsLoading ? (
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+            <span className="text-gray-600">Cargando divisiones...</span>
+          </div>
+        ) : divisions.length === 0 ? (
+          <div className="text-center py-8">
+            <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h4 className="text-lg font-medium text-gray-900 mb-2">
+              No hay divisiones disponibles
+            </h4>
+            <p className="text-gray-500">
+              No se encontraron divisiones para tu institución.
+            </p>
+          </div>
+        ) : (
+          <div className="max-w-md">
+            <label htmlFor="division-select" className="block text-sm font-medium text-gray-700 mb-2">
+              División
+            </label>
+            <select
+              id="division-select"
+              value={selectedDivision}
+              onChange={(e) => handleDivisionChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            >
+              <option value="">Selecciona una división</option>
+              {divisions.map((division) => (
+                <option key={division._id} value={division._id}>
+                  {division.nombre}
+                </option>
+              ))}
+            </select>
+            {selectedDivision && (
+              <p className="mt-2 text-sm text-gray-600">
+                División seleccionada: {divisions.find(d => d._id === selectedDivision)?.nombre}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Tabla de Asistencias */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Asistencias ({pagination?.totalItems || 0} registros)
-          </h3>
-        </div>
-        
-        {error && (
-          <div className="px-6 py-4 bg-red-50 border-b border-red-200">
-            <p className="text-red-600">{error}</p>
-          </div>
-        )}
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Alumno
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Grupo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Horarios
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Registrado Por
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {asistencias.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                    <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                    <p className="text-lg font-medium">No se encontraron asistencias</p>
-                    <p className="text-sm">Intenta ajustar los filtros o agregar nuevas asistencias</p>
-                  </td>
-                </tr>
-              ) : (
-                asistencias.flatMap((asistencia) =>
-                  asistencia.estudiantes.map((estudiante, index) => (
-                    <tr key={`${asistencia._id}-${index}`} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {estudiante.student ? `${estudiante.student.nombre} ${estudiante.student.apellido}` : 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {estudiante.student?.email}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {asistencia.division?.nombre || 'Sin grupo'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {asistencia.account?.nombre}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatDate(asistencia.fecha)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(estudiante.presente ? 'presente' : 'ausente')}`}>
-                          {estudiante.presente ? 'presente' : 'ausente'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          <div>N/A</div>
-                          <div>N/A</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {asistencia.creadoPor?.nombre}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedAsistencia({ asistencia, estudiante, index });
-                              setShowEditModal(true);
-                            }}
-                            className="text-green-600 hover:text-green-900"
-                            title="Editar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteAsistencia(asistencia._id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Paginación */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="px-6 py-4 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, pagination.totalItems)} de {pagination.totalItems} resultados
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePrevPage(filters)}
-                  disabled={!pagination.hasPrevPage}
-                  className="p-2 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Página anterior"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum, filters)}
-                        className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                          currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-600 hover:bg-gray-100'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <button
-                  onClick={() => handleNextPage(filters)}
-                  disabled={!pagination.hasNextPage}
-                  className="p-2 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Página siguiente"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Calendario de Asistencias */}
+      {selectedDivision && (
+        <AttendanceCalendar
+          selectedDivision={selectedDivision}
+          onDateClick={handleDateClick}
+        />
+      )}
+
+      {/* Modal de Asistencias del Día */}
+      <AttendanceDayModal
+        isOpen={showDayModal}
+        onClose={handleCloseDayModal}
+        date={selectedDate}
+        asistencias={selectedDayAsistencias}
+      />
 
       {/* Notificación */}
-      <Notification
-        type={notificationType}
-        message={notificationMessage}
-        isVisible={showNotification}
-        onClose={() => setShowNotification(false)}
-      />
+      {showNotification && (
+        <Notification
+          message={notificationMessage}
+          type={notificationType}
+          onClose={handleCloseNotification}
+        />
+      )}
     </div>
   );
-}; 
+};

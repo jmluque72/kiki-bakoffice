@@ -3,7 +3,7 @@ import { apiClient } from '../config/api';
 export interface User {
   _id: string;
   email: string;
-  nombre: string;
+  name: string;
   role: {
     _id: string;
     nombre: string;

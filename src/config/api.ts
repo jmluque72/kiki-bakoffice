@@ -65,6 +65,7 @@ export const API_ENDPOINTS = {
   
   // Cuentas
   ACCOUNTS: {
+    BASE: '/api/accounts',
     LIST: '/api/accounts',
     BY_ID: (id: string) => `/api/accounts/${id}`,
     CREATE: '/api/accounts',
@@ -155,6 +156,11 @@ export interface User {
     nombre: string;
     descripcion: string;
     nivel: number;
+  };
+  account?: {
+    _id: string;
+    nombre: string;
+    razonSocial: string;
   };
   activo: boolean;
   createdAt: string;

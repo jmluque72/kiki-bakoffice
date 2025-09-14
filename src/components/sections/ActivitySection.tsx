@@ -15,8 +15,12 @@ import { useActivities, ActivitiesFilters } from '../../hooks/useActivities';
 import { Activity } from '../../config/api';
 import { Notification } from '../Notification';
 import { ConfirmationDialog } from '../ConfirmationDialog';
+import { useAuth } from '../../hooks/useAuth';
 
 export const ActivitySection: React.FC = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  
   const {
     activities,
     loading,
@@ -64,11 +68,19 @@ export const ActivitySection: React.FC = () => {
   };
 
   const handleDeleteClick = (activity: Activity) => {
+    // Si es superadmin, no permitir eliminar
+    if (isSuperAdmin) {
+      return;
+    }
     setActivityToDelete(activity);
     setShowDeleteDialog(true);
   };
 
   const handleConfirmDelete = () => {
+    // Si es superadmin, no permitir eliminar
+    if (isSuperAdmin) {
+      return;
+    }
     if (activityToDelete) {
       handleDeleteActivity(activityToDelete._id);
     }
@@ -113,10 +125,10 @@ export const ActivitySection: React.FC = () => {
   };
 
   const filteredActivities = activities.filter(activity =>
-    activity.usuario.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    activity.usuario.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    activity.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    activity.account.nombre.toLowerCase().includes(searchTerm.toLowerCase())
+    (activity.usuario?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    (activity.usuario?.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    (activity.descripcion?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    (activity.account?.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
   );
 
   const todayActivities = activities.filter(activity => {
@@ -124,7 +136,7 @@ export const ActivitySection: React.FC = () => {
     return new Date(activity.createdAt).toDateString() === today;
   }).length;
 
-  const uniqueUsers = new Set(activities.map(activity => activity.usuario._id)).size;
+  const uniqueUsers = new Set(activities.map(activity => activity.usuario?._id).filter(Boolean)).size;
 
   if (loading) {
     return (
@@ -316,23 +328,25 @@ export const ActivitySection: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-900">
-                        <span className="font-semibold">{activity.usuario.name}</span> {activity.descripcion}
+                        <span className="font-semibold">{activity.usuario?.name || 'Usuario desconocido'}</span> {activity.descripcion}
                       </p>
                       <div className="flex items-center gap-2">
                         <p className="text-xs text-gray-500">
                           {formatDate(activity.createdAt)}
                         </p>
-                        <button
-                          onClick={() => handleDeleteClick(activity)}
-                          className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
-                          title="Eliminar actividad"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {!isSuperAdmin && (
+                          <button
+                            onClick={() => handleDeleteClick(activity)}
+                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors"
+                            title="Eliminar actividad"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-4 mt-1">
-                      <p className="text-sm text-gray-600">{activity.account.nombre}</p>
+                      <p className="text-sm text-gray-600">{activity.account?.nombre || 'Institución desconocida'}</p>
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTipoColor(activity.tipo)}`}>
                         {activity.tipo}
                       </span>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Plus, MoreVertical, Building2, TrendingUp, AlertCircle, Globe, Mail, X, Loader2, Edit, Trash2, Eye } from 'lucide-react';
+import { Search, Filter, Plus, MoreVertical, Building2, TrendingUp, AlertCircle, Globe, Mail, X, Loader2, Edit, Eye, UserPlus } from 'lucide-react';
 import { Institution } from '../../types';
 import { AccountService, CreateAccountRequest, UpdateAccountRequest } from '../../services/accountService';
 import { Account } from '../../config/api';
 import { ImageUpload } from '../ImageUpload';
+import { CreateAdminUserModal } from '../CreateAdminUserModal';
 import { config } from '../../config/env';
 import { UploadService } from '../../services/uploadService';
+import { useAuth } from '../../hooks/useAuth';
 
 interface InstitutionFormData {
   nombre: string;
@@ -18,12 +20,15 @@ interface InstitutionFormData {
 }
 
 export const AccountsSection: React.FC = () => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showModal, setShowModal] = useState(false);
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
   const [formData, setFormData] = useState<InstitutionFormData>({
     nombre: '',
     razonSocial: '',
@@ -97,6 +102,7 @@ export const AccountsSection: React.FC = () => {
   const pendingInstitutions = institutions.filter(inst => !inst.activo).length;
 
   const openModal = (account?: Account) => {
+    
     if (account) {
       setEditingAccount(account);
       setFormData({
@@ -150,6 +156,21 @@ export const AccountsSection: React.FC = () => {
     });
   };
 
+  const handleCreateAdminUser = (account: Account) => {
+    setSelectedAccount(account);
+    setShowCreateAdminModal(true);
+  };
+
+  const closeCreateAdminModal = () => {
+    setShowCreateAdminModal(false);
+    setSelectedAccount(null);
+  };
+
+  const handleAdminUserCreated = () => {
+    // Recargar la lista de cuentas
+    loadInstitutions();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -173,7 +194,7 @@ export const AccountsSection: React.FC = () => {
           await UploadService.updateAccountLogo(editingAccount._id, currentImageKey);
         }
       } else {
-        // Crear nueva cuenta
+        // Crear nueva cuenta (permitido para superadmin)
         const accountData: CreateAccountRequest = {
           nombre: formData.nombre,
           razonSocial: formData.razonSocial,
@@ -204,29 +225,6 @@ export const AccountsSection: React.FC = () => {
     }
   };
 
-  const handleDelete = async (account: Account) => {
-    setDeletingAccount(account);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!deletingAccount) return;
-    
-    try {
-      await AccountService.deleteAccount(deletingAccount._id);
-      
-      // Recargar datos
-      const response = await AccountService.getAccounts(currentPage, 10);
-      setInstitutions(response.accounts);
-      setTotalAccounts(response.total);
-      
-      setShowDeleteModal(false);
-      setDeletingAccount(null);
-    } catch (err: any) {
-      console.error('Error deleting account:', err);
-      setError(err.message || 'Error al eliminar la institución');
-    }
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -402,20 +400,33 @@ export const AccountsSection: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      <button 
-                        onClick={() => openModal(institution)}
-                        className="text-blue-600 hover:text-blue-800 p-1 rounded"
-                        title="Editar"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(institution)}
-                        className="text-red-600 hover:text-red-800 p-1 rounded"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isSuperAdmin && (
+                        <>
+                          <button 
+                            onClick={() => handleCreateAdminUser(institution)}
+                            className="text-green-600 hover:text-green-800 p-1 rounded"
+                            title="Crear Usuario Administrador"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => openModal(institution)}
+                            className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                            title="Editar Institución"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      {!isSuperAdmin && (
+                        <button 
+                          onClick={() => openModal(institution)}
+                          className="text-blue-600 hover:text-blue-800 p-1 rounded"
+                          title="Editar"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -574,58 +585,17 @@ export const AccountsSection: React.FC = () => {
         </div>
       )}
 
-      {/* Modal de Confirmación de Eliminación */}
-      {showDeleteModal && deletingAccount && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Confirmar Eliminación
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setDeletingAccount(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="mb-4">
-                <p className="text-gray-700">
-                  ¿Estás seguro de que quieres eliminar la institución <strong>{deletingAccount.nombre}</strong>?
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Esta acción no se puede deshacer.
-                </p>
-              </div>
-
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setDeletingAccount(null);
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Modal para crear usuario administrador */}
+      {showCreateAdminModal && selectedAccount && (
+        <CreateAdminUserModal
+          isOpen={showCreateAdminModal}
+          onClose={closeCreateAdminModal}
+          accountId={selectedAccount._id}
+          accountName={selectedAccount.nombre}
+          onSuccess={handleAdminUserCreated}
+        />
       )}
+
     </div>
   );
 };

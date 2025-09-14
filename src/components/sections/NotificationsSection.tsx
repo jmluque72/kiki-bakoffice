@@ -2,27 +2,74 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Send, Eye, Trash2, Plus, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { NotificationService, Notification, CreateNotificationRequest, PaginationInfo } from '../../services/notificationService';
+import { SendNotificationModal } from '../SendNotificationModal';
+import { userService } from '../../services/userService';
 
 export const NotificationsSection: React.FC = () => {
   const { user } = useAuth();
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  const canSendNotifications = !isSuperAdmin; // Solo superadmin no puede enviar
+  
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'informacion' | 'comunicacion'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
+  const [userNames, setUserNames] = useState<{[key: string]: string}>({});
 
-  // Formulario para crear notificación
-  const [formData, setFormData] = useState<CreateNotificationRequest>({
-    title: '',
-    message: '',
-    type: 'informacion',
-    accountId: user?.account?._id || '',
-    divisionId: '',
-    recipients: []
-  });
+  // Función para obtener nombres de usuarios
+  const loadUserNames = async (notification: Notification) => {
+    console.log('🔍 [loadUserNames] Iniciando carga de nombres para notificación:', notification._id);
+    console.log('🔍 [loadUserNames] readBy:', notification.readBy);
+    
+    if (!notification.readBy || notification.readBy.length === 0) {
+      console.log('🔍 [loadUserNames] No hay usuarios que leyeron la notificación');
+      return;
+    }
+    
+    const userIds = notification.readBy
+      .map(read => typeof read.user === 'string' ? read.user : read.user?._id)
+      .filter(Boolean);
+    
+    console.log('🔍 [loadUserNames] User IDs extraídos:', userIds);
+    
+    if (userIds.length === 0) {
+      console.log('🔍 [loadUserNames] No se encontraron IDs de usuario válidos');
+      return;
+    }
+    
+    try {
+      const userPromises = userIds.map(async (userId) => {
+        try {
+          console.log('🔍 [loadUserNames] Cargando usuario:', userId);
+          const user = await userService.getUserById(userId);
+          console.log('🔍 [loadUserNames] Usuario cargado:', user.name);
+          return { id: userId, name: user.name };
+        } catch (error) {
+          console.error(`Error loading user ${userId}:`, error);
+          return { id: userId, name: `Usuario ${userId.substring(0, 8)}...` };
+        }
+      });
+      
+      const users = await Promise.all(userPromises);
+      console.log('🔍 [loadUserNames] Usuarios cargados:', users);
+      
+      const nameMap = users.reduce((acc, user) => {
+        acc[user.id] = user.name;
+        return acc;
+      }, {} as {[key: string]: string});
+      
+      console.log('🔍 [loadUserNames] Mapa de nombres:', nameMap);
+      setUserNames(prev => ({ ...prev, ...nameMap }));
+    } catch (error) {
+      console.error('Error loading user names:', error);
+    }
+  };
 
   // Cargar notificaciones
   const loadNotifications = async (page: number = 1) => {
@@ -91,28 +138,6 @@ export const NotificationsSection: React.FC = () => {
     }
   };
 
-  // Enviar notificación
-  const sendNotification = async () => {
-    try {
-      setLoading(true);
-      await NotificationService.sendNotification(formData);
-      
-      setShowCreateModal(false);
-      setFormData({
-        title: '',
-        message: '',
-        type: 'informacion',
-        accountId: user?.account?._id || '',
-        divisionId: '',
-        recipients: []
-      });
-      await loadNotifications(1);
-    } catch (error) {
-      console.error('Error sending notification:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Marcar como leída
   const markAsRead = async (notificationId: string) => {
@@ -121,6 +146,25 @@ export const NotificationsSection: React.FC = () => {
       await loadNotifications(currentPage);
     } catch (error) {
       console.error('Error marking as read:', error);
+    }
+  };
+
+  // Manejar click en notificación
+  const handleNotificationClick = async (notification: Notification) => {
+    try {
+      // Marcar como leída si no está leída
+      if (notification.status !== 'read') {
+        await markAsRead(notification._id);
+      }
+      
+      // Abrir popup con detalles
+      setSelectedNotification(notification);
+      setShowDetailsModal(true);
+      
+      // Cargar nombres de usuarios que leyeron la notificación
+      loadUserNames(notification);
+    } catch (error) {
+      console.error('Error handling notification click:', error);
     }
   };
 
@@ -192,13 +236,15 @@ export const NotificationsSection: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Notificaciones</h1>
           <p className="text-gray-600">Gestiona las notificaciones de la institución</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva Notificación
-        </button>
+        {canSendNotifications && (
+          <button
+            onClick={() => setShowSendModal(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            Enviar Notificación
+          </button>
+        )}
       </div>
 
       {/* Título de la sección según el rol */}
@@ -252,7 +298,11 @@ export const NotificationsSection: React.FC = () => {
         ) : (
           <div className="divide-y divide-gray-200">
             {filteredNotifications.map((notification) => (
-              <div key={notification._id} className="p-6 hover:bg-gray-50 transition-colors">
+              <div 
+                key={notification._id} 
+                className="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => handleNotificationClick(notification)}
+              >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -319,14 +369,20 @@ export const NotificationsSection: React.FC = () => {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => markAsRead(notification._id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAsRead(notification._id);
+                      }}
                       className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                       title="Marcar como leída"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => deleteNotification(notification._id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notification._id);
+                      }}
                       className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                       title="Eliminar"
                     >
@@ -398,65 +454,179 @@ export const NotificationsSection: React.FC = () => {
         </div>
       )}
 
-      {/* Modal para crear notificación */}
-      {showCreateModal && (
+
+      {/* Modal de detalles de notificación */}
+      {showDetailsModal && selectedNotification && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">Nueva Notificación</h2>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-900">Detalles de la Notificación</h2>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Título de la notificación"
-                />
+            <div className="space-y-6">
+              {/* Header con título y tipo */}
+              <div className="border-b border-gray-200 pb-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-2xl font-bold text-gray-900">{selectedNotification.title}</h3>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(selectedNotification.type)}`}>
+                    {selectedNotification.type.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-gray-600 text-lg leading-relaxed">{selectedNotification.message}</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Mensaje</label>
-                <textarea
-                  value={formData.message}
-                  onChange={(e) => setFormData({...formData, message: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={4}
-                  placeholder="Mensaje de la notificación"
-                />
+              {/* Información del remitente y fecha */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">Información del Envío</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600">Enviado por:</span>
+                      <span className="ml-2 text-gray-900">{selectedNotification.sender.nombre}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Fecha:</span>
+                      <span className="ml-2 text-gray-900">
+                        {new Date(selectedNotification.sentAt).toLocaleDateString('es-ES', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-600">Estado:</span>
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                        selectedNotification.status === 'read' 
+                          ? 'bg-green-100 text-green-800' 
+                          : selectedNotification.status === 'delivered'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {selectedNotification.status === 'read' ? 'Leída' : 
+                         selectedNotification.status === 'delivered' ? 'Entregada' : 'Enviada'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-2">Información de la Institución</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-600">Cuenta:</span>
+                      <span className="ml-2 text-gray-900">{selectedNotification.account.nombre}</span>
+                    </div>
+                    {selectedNotification.division && (
+                      <div>
+                        <span className="font-medium text-gray-600">División:</span>
+                        <span className="ml-2 text-gray-900">{selectedNotification.division.nombre}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value as any})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="informacion">Información</option>
-                  <option value="comunicacion">Comunicación</option>
-                </select>
+              {/* Destinatarios */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-3">Destinatarios</h4>
+                {selectedNotification.recipients && selectedNotification.recipients.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {selectedNotification.recipients.map((recipient) => (
+                      <div key={recipient._id} className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-sm text-gray-900">{recipient.nombre}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">Sin destinatarios específicos</p>
+                )}
               </div>
+
+              {/* Estadísticas de lectura */}
+              {selectedNotification.recipients && selectedNotification.recipients.length > 0 && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-3">Estadísticas de Lectura</h4>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">{selectedNotification.recipients.length}</div>
+                      <div className="text-sm text-gray-600">Total destinatarios</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-green-600">{selectedNotification.readBy?.length || 0}</div>
+                      <div className="text-sm text-gray-600">Leídas</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-orange-600">
+                        {selectedNotification.recipients.length - (selectedNotification.readBy?.length || 0)}
+                      </div>
+                      <div className="text-sm text-gray-600">Pendientes</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de lecturas */}
+              {selectedNotification.readBy && selectedNotification.readBy.length > 0 && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 mb-3">Leída por</h4>
+                  <div className="space-y-2">
+                    {selectedNotification.readBy.map((read, index) => (
+                      <div key={index} className="flex justify-between items-center text-sm">
+                        <span className="text-gray-900">
+                          {typeof read.user === 'string' 
+                            ? (userNames[read.user] || `Usuario ${read.user.substring(0, 8)}...`)
+                            : read.user?.name || 'Usuario desconocido'
+                          }
+                        </span>
+                        <span className="text-gray-500">
+                          {new Date(read.readAt).toLocaleDateString('es-ES', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-3 mt-6">
+            <div className="flex justify-end mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => setShowDetailsModal(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
               >
-                Cancelar
-              </button>
-              <button
-                onClick={sendNotification}
-                disabled={!formData.title || !formData.message || loading}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Enviando...' : 'Enviar'}
+                Cerrar
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal para enviar notificaciones (todos excepto superadmin) */}
+      {canSendNotifications && (
+        <SendNotificationModal
+          isOpen={showSendModal}
+          onClose={() => setShowSendModal(false)}
+          onSuccess={() => {
+            loadNotifications(1);
+            setShowSendModal(false);
+          }}
+        />
       )}
     </div>
   );

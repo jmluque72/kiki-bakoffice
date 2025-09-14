@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { login, isLoading, error: authError } = useAuth();
 
   // Limpiar error cuando el usuario empiece a escribir
@@ -113,8 +115,25 @@ export const Login: React.FC = () => {
           >
             {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+              disabled={isLoading}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
         </form>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        onBackToLogin={() => setShowForgotPassword(false)}
+      />
     </div>
   );
 };

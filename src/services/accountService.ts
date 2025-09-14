@@ -20,6 +20,12 @@ export interface UpdateAccountRequest {
   activo?: boolean;
 }
 
+export interface CreateAdminUserRequest {
+  nombre: string;
+  apellido: string;
+  email: string;
+}
+
 export interface AccountStats {
   totalAccounts: number;
   activeAccounts: number;
@@ -105,6 +111,29 @@ export class AccountService {
       return response.data.data!;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Error al obtener estadísticas');
+    }
+  }
+
+  static async createAdminUser(accountId: string, adminData: CreateAdminUserRequest): Promise<{
+    user: any;
+    account: any;
+  }> {
+    try {
+      console.log('🚀 [FRONTEND] Creando usuario adminaccount...', { accountId, adminData });
+      
+      const response = await apiClient.post<ApiResponse<{
+        user: any;
+        account: any;
+      }>>(
+        `${API_ENDPOINTS.ACCOUNTS.BASE}/${accountId}/admin-users`,
+        adminData
+      );
+      
+      console.log('✅ [FRONTEND] Respuesta del servidor:', response.data);
+      return response.data.data!;
+    } catch (error: any) {
+      console.error('❌ [FRONTEND] Error en createAdminUser:', error);
+      throw new Error(error.response?.data?.message || 'Error al crear usuario administrador');
     }
   }
 } 
