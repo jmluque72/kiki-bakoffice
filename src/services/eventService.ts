@@ -3,25 +3,40 @@ import { apiClient } from '../config/api';
 // Interfaces para eventos
 export interface Event {
   _id: string;
-  nombre: string;
+  titulo: string;
   descripcion: string;
-  fechaInicio: string;
-  fechaFin: string;
-  ubicacion: {
-    nombre: string;
-  };
-  categoria: string;
+  fecha: string;
+  hora: string;
+  lugar: string;
   estado: string;
   participantes: any[];
-  capacidadMaxima?: number;
-  organizador: {
+  creador: {
     name: string;
   };
-  autorizaciones?: any[];
+  institucion: {
+    _id: string;
+    nombre: string;
+  };
   division?: {
     _id: string;
     nombre: string;
   };
+  autorizaciones?: {
+    _id: string;
+    tipo: string;
+    estado: 'pendiente' | 'aprobada' | 'rechazada';
+    estudiante?: {
+      _id: string;
+      nombre: string;
+      email: string;
+    };
+    autorizadoPor?: {
+      _id: string;
+      nombre: string;
+    };
+    fechaAutorizacion?: string;
+    observaciones?: string;
+  }[];
 }
 
 export interface EventCalendarData {

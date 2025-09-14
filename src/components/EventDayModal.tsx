@@ -67,35 +67,6 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
     }
   };
 
-  const getCategoriaColor = (categoria: string) => {
-    switch (categoria) {
-      case 'reunion': return 'bg-blue-100 text-blue-800';
-      case 'taller': return 'bg-green-100 text-green-800';
-      case 'conferencia': return 'bg-purple-100 text-purple-800';
-      case 'seminario': return 'bg-yellow-100 text-yellow-800';
-      case 'webinar': return 'bg-indigo-100 text-indigo-800';
-      case 'curso': return 'bg-pink-100 text-pink-800';
-      case 'actividad_social': return 'bg-orange-100 text-orange-800';
-      case 'deportivo': return 'bg-red-100 text-red-800';
-      case 'cultural': return 'bg-teal-100 text-teal-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getCategoriaText = (categoria: string) => {
-    switch (categoria) {
-      case 'reunion': return 'Reunión';
-      case 'taller': return 'Taller';
-      case 'conferencia': return 'Conferencia';
-      case 'seminario': return 'Seminario';
-      case 'webinar': return 'Webinar';
-      case 'curso': return 'Curso';
-      case 'actividad_social': return 'Actividad Social';
-      case 'deportivo': return 'Deportivo';
-      case 'cultural': return 'Cultural';
-      default: return categoria;
-    }
-  };
 
   const displayDate = formatDate(date);
 
@@ -134,13 +105,13 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
                   {/* Event Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{event.nombre}</h3>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{event.titulo}</h3>
                       <div className="flex items-center space-x-4 mb-3">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getEstadoColor(event.estado)}`}>
                           {getEstadoText(event.estado)}
                         </span>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoriaColor(event.categoria)}`}>
-                          {getCategoriaText(event.categoria)}
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          Evento
                         </span>
                       </div>
                     </div>
@@ -162,13 +133,8 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
                         <div>
                           <p className="text-sm font-medium text-gray-900">Fecha y Hora</p>
                           <p className="text-sm text-gray-600">
-                            {formatDate(event.fechaInicio)} - {formatTime(event.fechaInicio)}
+                            {formatDate(event.fecha)} - {event.hora}
                           </p>
-                          {event.fechaFin && event.fechaFin !== event.fechaInicio && (
-                            <p className="text-sm text-gray-600">
-                              Hasta: {formatTime(event.fechaFin)}
-                            </p>
-                          )}
                         </div>
                       </div>
 
@@ -176,7 +142,7 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
                         <MapPin className="h-5 w-5 text-gray-400" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">Ubicación</p>
-                          <p className="text-sm text-gray-600">{event.ubicacion.nombre}</p>
+                          <p className="text-sm text-gray-600">{event.lugar || 'No especificada'}</p>
                         </div>
                       </div>
 
@@ -184,7 +150,7 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
                         <User className="h-5 w-5 text-gray-400" />
                         <div>
                           <p className="text-sm font-medium text-gray-900">Organizador</p>
-                          <p className="text-sm text-gray-600">{event.organizador.name}</p>
+                          <p className="text-sm text-gray-600">{event.creador?.name || 'No especificado'}</p>
                         </div>
                       </div>
                     </div>
@@ -214,10 +180,7 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
                         <div>
                           <p className="text-sm font-medium text-gray-900">Duración</p>
                           <p className="text-sm text-gray-600">
-                            {event.fechaFin ? 
-                              `${Math.round((new Date(event.fechaFin).getTime() - new Date(event.fechaInicio).getTime()) / (1000 * 60 * 60))} horas` :
-                              'Sin duración definida'
-                            }
+                            No especificada
                           </p>
                         </div>
                       </div>
@@ -229,34 +192,57 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
                     <div className="border-t border-gray-200 pt-4">
                       <div className="flex items-center space-x-2 mb-3">
                         <FileText className="h-5 w-5 text-gray-400" />
-                        <h4 className="text-sm font-medium text-gray-900">Autorizaciones</h4>
+                        <h4 className="text-sm font-medium text-gray-900">
+                          Autorizaciones ({event.autorizaciones.length})
+                        </h4>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {event.autorizaciones.map((auth, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              {auth.estado === 'aprobada' ? (
-                                <CheckCircle className="h-5 w-5 text-green-600" />
-                              ) : auth.estado === 'rechazada' ? (
-                                <XCircle className="h-5 w-5 text-red-600" />
-                              ) : (
-                                <AlertCircle className="h-5 w-5 text-yellow-600" />
-                              )}
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{auth.tipo}</p>
-                                <p className="text-xs text-gray-600">
-                                  {auth.estudiante?.nombre || 'Estudiante no especificado'}
-                                </p>
+                          <div key={auth._id || index} className="p-4 bg-gray-50 rounded-lg border">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center space-x-3">
+                                {auth.estado === 'aprobada' ? (
+                                  <CheckCircle className="h-5 w-5 text-green-600" />
+                                ) : auth.estado === 'rechazada' ? (
+                                  <XCircle className="h-5 w-5 text-red-600" />
+                                ) : (
+                                  <AlertCircle className="h-5 w-5 text-yellow-600" />
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{auth.tipo}</p>
+                                  <p className="text-xs text-gray-600">
+                                    {auth.estudiante?.nombre || 'Estudiante no especificado'}
+                                  </p>
+                                </div>
                               </div>
+                              <span className={`text-xs px-2 py-1 rounded-full ${
+                                auth.estado === 'aprobada' ? 'bg-green-100 text-green-800' :
+                                auth.estado === 'rechazada' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {auth.estado === 'aprobada' ? 'Aprobada' :
+                                 auth.estado === 'rechazada' ? 'Rechazada' : 'Pendiente'}
+                              </span>
                             </div>
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              auth.estado === 'aprobada' ? 'bg-green-100 text-green-800' :
-                              auth.estado === 'rechazada' ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {auth.estado === 'aprobada' ? 'Aprobada' :
-                               auth.estado === 'rechazada' ? 'Rechazada' : 'Pendiente'}
-                            </span>
+                            
+                            {/* Información adicional de la autorización */}
+                            <div className="mt-2 space-y-1">
+                              {auth.autorizadoPor && (
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-medium">Autorizado por:</span> {auth.autorizadoPor.nombre}
+                                </p>
+                              )}
+                              {auth.fechaAutorizacion && (
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-medium">Fecha:</span> {new Date(auth.fechaAutorizacion).toLocaleDateString('es-ES')}
+                                </p>
+                              )}
+                              {auth.observaciones && (
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-medium">Observaciones:</span> {auth.observaciones}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
