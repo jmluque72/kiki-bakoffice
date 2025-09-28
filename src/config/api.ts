@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configuración base del API
-const API_BASE_URL = 'http://192.168.68.106:3000';
+const API_BASE_URL = "https://api.kiki.com.ar";
 
 // Crear instancia de axios con configuración base
 export const apiClient = axios.create({
