@@ -1,184 +1,150 @@
-import { useState, useEffect } from 'react';
-import { apiClient, API_ENDPOINTS } from '../config/api';
-
-export interface Event {
-  _id: string;
-  nombre: string;
-  descripcion: string;
-  categoria: string;
-  fechaInicio: string;
-  fechaFin: string;
-  ubicacion: {
-    nombre: string;
-    direccion?: string;
-    esVirtual: boolean;
-    enlaceVirtual?: string;
-  };
-  organizador: {
-    _id: string;
-    name: string;
-    email: string;
-  };
-  cuenta: {
-    _id: string;
-    nombre: string;
-    razonSocial: string;
-  };
-  capacidadMaxima?: number;
-  participantes: Array<{
-    usuario: {
-      _id: string;
-      name: string;
-      email: string;
-    };
-    fechaInscripcion: string;
-    estadoParticipacion: 'confirmado' | 'pendiente' | 'cancelado';
-  }>;
-  estado: 'borrador' | 'publicado' | 'en_curso' | 'finalizado' | 'cancelado';
-  esPublico: boolean;
-  requiereAprobacion: boolean;
-  imagen?: string;
-  tags: string[];
-  metadatos: {
-    creadoPor: {
-      _id: string;
-      name: string;
-      email: string;
-    };
-    fechaCreacion: string;
-    ultimaModificacion: string;
-    modificadoPor?: {
-      _id: string;
-      name: string;
-      email: string;
-    };
-  };
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EventsFilters {
-  accountId?: string;
-  categoria?: string;
-  estado?: string;
-  search?: string;
-  page?: number;
-  limit?: number;
-}
+import { useState, useEffect, useCallback } from 'react';
+import { EventService, Event, CreateEventRequest } from '../services/eventService';
 
 export const useEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
 
-  const fetchEvents = async (filters: EventsFilters = {}) => {
+  const loadEvents = useCallback(async (filters: {
+    page?: number;
+    limit?: number;
+    institucion?: string;
+    division?: string;
+    estado?: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+    search?: string;
+  } = {}) => {
     try {
       setLoading(true);
       setError(null);
+
+      const result = await EventService.getEvents(filters);
       
-      const params = new URLSearchParams();
-      if (filters.accountId) params.append('accountId', filters.accountId);
-      if (filters.categoria) params.append('categoria', filters.categoria);
-      if (filters.estado) params.append('estado', filters.estado);
-      if (filters.search) params.append('search', filters.search);
-      if (filters.page) params.append('page', filters.page.toString());
-      if (filters.limit) params.append('limit', filters.limit.toString());
-      
-      const response = await apiClient.get(`${API_ENDPOINTS.EVENTS.LIST}?${params.toString()}`);
-      
-      if (response.data.success) {
-        setEvents(response.data.data.events);
-        setTotal(response.data.data.total);
-        setPage(response.data.data.page);
-        setLimit(response.data.data.limit);
-      } else {
-        setError(response.data.message || 'Error al cargar los eventos');
-      }
+      setEvents(result.events);
+      setPagination({
+        currentPage: result.page,
+        totalPages: Math.ceil(result.total / result.limit),
+        totalItems: result.total,
+        itemsPerPage: result.limit,
+        hasNextPage: result.page < Math.ceil(result.total / result.limit),
+        hasPrevPage: result.page > 1
+      });
+
     } catch (err: any) {
-      console.error('Error fetching events:', err);
-      setError(err.response?.data?.message || 'Error al cargar los eventos');
+      console.error('Error loading events:', err);
+      setError(err.message || 'Error al cargar eventos');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const createEvent = async (eventData: any) => {
+  const createEvent = useCallback(async (eventData: CreateEventRequest): Promise<boolean> => {
     try {
+      setLoading(true);
       setError(null);
-      const response = await apiClient.post(API_ENDPOINTS.EVENTS.CREATE, eventData);
+
+      const result = await EventService.createEvent(eventData);
       
-      if (response.data.success) {
-        await fetchEvents();
-        return { success: true, message: 'Evento creado exitosamente' };
+      if (result.success) {
+        // Add the new event to the list if data is available
+        if (result.data) {
+          setEvents(prev => [result.data!, ...prev]);
+        }
+        return true;
       } else {
-        setError(response.data.message || 'Error al crear el evento');
-        return { success: false, message: response.data.message };
+        setError(result.message || 'Error al crear evento');
+        return false;
       }
+
     } catch (err: any) {
       console.error('Error creating event:', err);
-      const errorMessage = err.response?.data?.message || 'Error al crear el evento';
-      setError(errorMessage);
-      return { success: false, message: errorMessage };
+      setError(err.message || 'Error al crear evento');
+      return false;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const updateEvent = async (eventId: string, updateData: any) => {
+  const updateEvent = useCallback(async (eventId: string, eventData: Partial<CreateEventRequest>): Promise<boolean> => {
     try {
+      setLoading(true);
       setError(null);
-      const response = await apiClient.put(API_ENDPOINTS.EVENTS.UPDATE(eventId), updateData);
+
+      const result = await EventService.updateEvent(eventId, eventData);
       
-      if (response.data.success) {
-        await fetchEvents();
-        return { success: true, message: 'Evento actualizado exitosamente' };
+      if (result.success && result.data) {
+        // Update the event in the list
+        setEvents(prev => prev.map(event => 
+          event._id === eventId ? result.data! : event
+        ));
+        return true;
       } else {
-        setError(response.data.message || 'Error al actualizar el evento');
-        return { success: false, message: response.data.message };
+        setError(result.message || 'Error al actualizar evento');
+        return false;
       }
+
     } catch (err: any) {
       console.error('Error updating event:', err);
-      const errorMessage = err.response?.data?.message || 'Error al actualizar el evento';
-      setError(errorMessage);
-      return { success: false, message: errorMessage };
+      setError(err.message || 'Error al actualizar evento');
+      return false;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const deleteEvent = async (eventId: string) => {
+  const deleteEvent = useCallback(async (eventId: string): Promise<boolean> => {
     try {
+      setLoading(true);
       setError(null);
-      const response = await apiClient.delete(API_ENDPOINTS.EVENTS.DELETE(eventId));
+
+      const result = await EventService.deleteEvent(eventId);
       
-      if (response.data.success) {
-        await fetchEvents();
-        return { success: true, message: 'Evento eliminado exitosamente' };
+      if (result.success) {
+        // Remove the event from the list
+        setEvents(prev => prev.filter(event => event._id !== eventId));
+        return true;
       } else {
-        setError(response.data.message || 'Error al eliminar el evento');
-        return { success: false, message: response.data.message };
+        setError(result.message || 'Error al eliminar evento');
+        return false;
       }
+
     } catch (err: any) {
       console.error('Error deleting event:', err);
-      const errorMessage = err.response?.data?.message || 'Error al eliminar el evento';
-      setError(errorMessage);
-      return { success: false, message: errorMessage };
+      setError(err.message || 'Error al eliminar evento');
+      return false;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => {
-    fetchEvents();
+  const refreshEvents = useCallback(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
   return {
     events,
     loading,
     error,
-    total,
-    page,
-    limit,
-    fetchEvents,
+    pagination,
+    loadEvents,
     createEvent,
     updateEvent,
-    deleteEvent
+    deleteEvent,
+    refreshEvents,
+    clearError
   };
-}; 
+};

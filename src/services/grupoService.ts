@@ -48,7 +48,7 @@ class GrupoService {
       if (search) params.append('search', search);
       if (cuentaId) params.append('cuentaId', cuentaId);
 
-      const response = await apiClient.get(`/api/grupos?${params.toString()}`);
+      const response = await apiClient.get(`/grupos?${params.toString()}`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching grupos:', error);
@@ -58,7 +58,7 @@ class GrupoService {
 
   async getGrupoById(id: string): Promise<Grupo> {
     try {
-      const response = await apiClient.get(`/api/grupos/${id}`);
+      const response = await apiClient.get(`/grupos/${id}`);
       return response.data.data.grupo;
     } catch (error) {
       console.error('Error fetching grupo:', error);
@@ -68,7 +68,7 @@ class GrupoService {
 
   async createGrupo(grupoData: CreateGrupoRequest): Promise<Grupo> {
     try {
-      const response = await apiClient.post(`/api/grupos`, grupoData);
+      const response = await apiClient.post(`/grupos`, grupoData);
       return response.data.data.grupo;
     } catch (error) {
       console.error('Error creating grupo:', error);
@@ -78,7 +78,7 @@ class GrupoService {
 
   async updateGrupo(id: string, grupoData: UpdateGrupoRequest): Promise<Grupo> {
     try {
-      const response = await apiClient.put(`/api/grupos/${id}`, grupoData);
+      const response = await apiClient.put(`/grupos/${id}`, grupoData);
       return response.data.data.grupo;
     } catch (error) {
       console.error('Error updating grupo:', error);
@@ -88,7 +88,7 @@ class GrupoService {
 
   async deleteGrupo(id: string): Promise<void> {
     try {
-      await apiClient.delete(`/api/grupos/${id}`);
+      await apiClient.delete(`/grupos/${id}`);
     } catch (error) {
       console.error('Error deleting grupo:', error);
       throw error;

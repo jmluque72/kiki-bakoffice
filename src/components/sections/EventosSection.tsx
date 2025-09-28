@@ -4,7 +4,8 @@ import {
   Clock,
   Building2,
   AlertCircle,
-  Loader2
+  Loader2,
+  Plus
 } from 'lucide-react';
 import { useEvents, Event } from '../../hooks/useEvents';
 import { Notification } from '../Notification';
@@ -12,6 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDivisions } from '../../hooks/useDivisions';
 import { EventsCalendar } from '../EventsCalendar';
 import { EventDayModal } from '../EventDayModal';
+import { CreateEventModal } from '../CreateEventModal';
 
 export const EventosSection: React.FC = () => {
   const { user } = useAuth();
@@ -25,6 +27,7 @@ export const EventosSection: React.FC = () => {
   
   const [selectedDivision, setSelectedDivision] = useState<string>('');
   const [showEventModal, setShowEventModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
   const [showNotification, setShowNotification] = useState(false);
@@ -57,6 +60,20 @@ export const EventosSection: React.FC = () => {
     setSelectedDateEvents([]);
   };
 
+  // Manejar creación de evento
+  const handleCreateEvent = () => {
+    setShowCreateModal(true);
+  };
+
+  // Manejar evento creado
+  const handleEventCreated = () => {
+    setShowNotification(true);
+    setNotificationMessage('Evento creado exitosamente');
+    setNotificationType('success');
+    // Refrescar el calendario para mostrar el nuevo evento
+    window.location.reload(); // Solución simple para refrescar todo
+  };
+
   // Cerrar notificación
   const handleCloseNotification = () => {
     setShowNotification(false);
@@ -87,9 +104,16 @@ export const EventosSection: React.FC = () => {
           <Calendar className="h-8 w-8 text-blue-600" />
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Eventos</h2>
-            <p className="text-gray-600">Consulta de eventos por división</p>
+            <p className="text-gray-600">Consulta y gestión de eventos por división</p>
           </div>
         </div>
+        <button
+          onClick={handleCreateEvent}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+        >
+          <Plus className="h-4 w-4" />
+          <span>Crear Evento</span>
+        </button>
       </div>
 
       {/* Error de divisiones */}
@@ -153,10 +177,13 @@ export const EventosSection: React.FC = () => {
 
       {/* Calendario de Eventos */}
       {selectedDivision && (
-        <EventsCalendar
-          selectedDivision={selectedDivision}
-          onDateClick={handleDateClick}
-        />
+        <>
+          {console.log('📅 [EVENTOS_SECTION] Renderizando EventsCalendar con división:', selectedDivision)}
+          <EventsCalendar
+            selectedDivision={selectedDivision}
+            onDateClick={handleDateClick}
+          />
+        </>
       )}
 
       {/* Modal de Eventos del Día */}
@@ -165,6 +192,13 @@ export const EventosSection: React.FC = () => {
         onClose={handleCloseEventModal}
         date={selectedDate}
         events={selectedDateEvents}
+      />
+
+      {/* Modal de Crear Evento */}
+      <CreateEventModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onEventCreated={handleEventCreated}
       />
 
       {/* Notificación */}

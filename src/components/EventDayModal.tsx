@@ -28,6 +28,9 @@ export const EventDayModal: React.FC<EventDayModalProps> = ({
   date,
   events
 }) => {
+  console.log('📅 [EVENT_DAY_MODAL] Modal abierto con fecha:', date);
+  console.log('📅 [EVENT_DAY_MODAL] Eventos recibidos:', events.length);
+  
   if (!isOpen) return null;
 
   const formatDate = (dateString: string) => {

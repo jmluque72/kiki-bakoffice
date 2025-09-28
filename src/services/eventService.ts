@@ -1,17 +1,18 @@
 import { apiClient } from '../config/api';
 
-// Interfaces para eventos
 export interface Event {
   _id: string;
   titulo: string;
   descripcion: string;
   fecha: string;
   hora: string;
-  lugar: string;
-  estado: string;
-  participantes: any[];
+  lugar?: string;
+  estado: 'activo' | 'finalizado' | 'cancelado';
+  requiereAutorizacion?: boolean;
   creador: {
+    _id: string;
     name: string;
+    email: string;
   };
   institucion: {
     _id: string;
@@ -21,22 +22,28 @@ export interface Event {
     _id: string;
     nombre: string;
   };
-  autorizaciones?: {
-    _id: string;
-    tipo: string;
-    estado: 'pendiente' | 'aprobada' | 'rechazada';
-    estudiante?: {
-      _id: string;
-      nombre: string;
-      email: string;
-    };
-    autorizadoPor?: {
-      _id: string;
-      nombre: string;
-    };
-    fechaAutorizacion?: string;
-    observaciones?: string;
-  }[];
+  participantes: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEventRequest {
+  titulo: string;
+  descripcion: string;
+  fecha: string;
+  hora: string;
+  lugar?: string;
+  institutionId: string;
+  divisionId: string;
+  estado?: string;
+  requiereAutorizacion?: boolean;
+}
+
+export interface EventsResponse {
+  events: Event[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface EventCalendarData {
@@ -54,7 +61,6 @@ export interface ApiResponse<T> {
 }
 
 export class EventService {
-  // Obtener datos del calendario (solo fechas con eventos)
   static async getCalendarData(params: {
     divisionId: string;
     fechaInicio: string;
@@ -76,46 +82,30 @@ export class EventService {
     }
   }
 
-  // Obtener eventos detallados para un día específico
-  static async getDayEvents(fecha: string, divisionId: string): Promise<Event[]> {
-    try {
-      const queryParams = new URLSearchParams();
-      queryParams.append('fecha', fecha);
-      queryParams.append('divisionId', divisionId);
-
-      const response = await apiClient.get<ApiResponse<Event[]>>(
-        `/backoffice/eventos/day?${queryParams.toString()}`
-      );
-      
-      return response.data.data!;
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Error al obtener eventos del día');
-    }
-  }
-
-  // Obtener todos los eventos con filtros
   static async getEvents(filters: {
-    divisionId?: string;
-    fechaInicio?: string;
-    fechaFin?: string;
-    estado?: string;
-    categoria?: string;
     page?: number;
     limit?: number;
-  } = {}): Promise<{ events: Event[]; total: number; page: number; limit: number }> {
+    institucion?: string;
+    division?: string;
+    estado?: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+    search?: string;
+  } = {}): Promise<EventsResponse> {
     try {
       const queryParams = new URLSearchParams();
       
-      if (filters.divisionId) queryParams.append('divisionId', filters.divisionId);
-      if (filters.fechaInicio) queryParams.append('fechaInicio', filters.fechaInicio);
-      if (filters.fechaFin) queryParams.append('fechaFin', filters.fechaFin);
-      if (filters.estado) queryParams.append('estado', filters.estado);
-      if (filters.categoria) queryParams.append('categoria', filters.categoria);
       if (filters.page) queryParams.append('page', filters.page.toString());
       if (filters.limit) queryParams.append('limit', filters.limit.toString());
+      if (filters.institucion) queryParams.append('institucion', filters.institucion);
+      if (filters.division) queryParams.append('division', filters.division);
+      if (filters.estado) queryParams.append('estado', filters.estado);
+      if (filters.fechaInicio) queryParams.append('fechaInicio', filters.fechaInicio);
+      if (filters.fechaFin) queryParams.append('fechaFin', filters.fechaFin);
+      if (filters.search) queryParams.append('search', filters.search);
 
-      const response = await apiClient.get<ApiResponse<{ events: Event[]; total: number; page: number; limit: number }>>(
-        `/backoffice/eventos?${queryParams.toString()}`
+      const response = await apiClient.get<ApiResponse<EventsResponse>>(
+        `/api/events?${queryParams.toString()}`
       );
       
       return response.data.data!;
@@ -124,33 +114,52 @@ export class EventService {
     }
   }
 
-  // Crear evento
-  static async createEvent(eventData: Partial<Event>): Promise<{ success: boolean; message: string; data?: Event }> {
+  static async getEventById(eventId: string): Promise<Event> {
     try {
-      const response = await apiClient.post<ApiResponse<Event>>('/backoffice/eventos', eventData);
+      const response = await apiClient.get<ApiResponse<{ event: Event }>>(
+        `/api/events/${eventId}`
+      );
+      
+      return response.data.data!.event;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener evento');
+    }
+  }
+
+  static async createEvent(eventData: CreateEventRequest): Promise<{ success: boolean; message: string; data?: Event }> {
+    try {
+      console.log('🚀 [EVENT_SERVICE] Enviando datos:', eventData);
+      console.log('🚀 [EVENT_SERVICE] URL completa:', apiClient.defaults.baseURL + '/events/create');
+      
+      const response = await apiClient.post<ApiResponse<{ event: Event }>>('/events/create', eventData);
+      
+      console.log('✅ [EVENT_SERVICE] Respuesta exitosa:', response.data);
       
       return {
         success: true,
         message: 'Evento creado exitosamente',
-        data: response.data.data
+        data: response.data.data!.event
       };
     } catch (error: any) {
+      console.log('❌ [EVENT_SERVICE] Error completo:', error);
+      console.log('❌ [EVENT_SERVICE] Error response:', error.response);
+      console.log('❌ [EVENT_SERVICE] Error message:', error.message);
+      
       return {
         success: false,
-        message: error.response?.data?.message || 'Error al crear evento'
+        message: error.response?.data?.message || error.message || 'Error al crear evento'
       };
     }
   }
 
-  // Actualizar evento
-  static async updateEvent(eventId: string, eventData: Partial<Event>): Promise<{ success: boolean; message: string; data?: Event }> {
+  static async updateEvent(eventId: string, eventData: Partial<CreateEventRequest>): Promise<{ success: boolean; message: string; data?: Event }> {
     try {
-      const response = await apiClient.put<ApiResponse<Event>>(`/backoffice/eventos/${eventId}`, eventData);
+      const response = await apiClient.put<ApiResponse<{ event: Event }>>(`/api/events/${eventId}`, eventData);
       
       return {
         success: true,
         message: 'Evento actualizado exitosamente',
-        data: response.data.data
+        data: response.data.data!.event
       };
     } catch (error: any) {
       return {
@@ -160,10 +169,9 @@ export class EventService {
     }
   }
 
-  // Eliminar evento
   static async deleteEvent(eventId: string): Promise<{ success: boolean; message: string }> {
     try {
-      await apiClient.delete(`/backoffice/eventos/${eventId}`);
+      await apiClient.delete(`/api/events/${eventId}`);
       
       return {
         success: true,
@@ -174,6 +182,28 @@ export class EventService {
         success: false,
         message: error.response?.data?.message || 'Error al eliminar evento'
       };
+    }
+  }
+
+  static async getEventStats(institutionId: string): Promise<{
+    total: number;
+    activos: number;
+    finalizados: number;
+    cancelados: number;
+    proximos: number;
+  }> {
+    try {
+      const response = await apiClient.get<ApiResponse<{
+        total: number;
+        activos: number;
+        finalizados: number;
+        cancelados: number;
+        proximos: number;
+      }>>(`/api/events/stats/${institutionId}`);
+      
+      return response.data.data!;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener estadísticas de eventos');
     }
   }
 }

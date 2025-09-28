@@ -3,33 +3,55 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Calendar as CalendarIcon,
-  MapPin,
-  Clock,
-  Users,
   AlertCircle
 } from 'lucide-react';
-import { EventService, Event } from '../services/eventService';
+import { apiClient } from '../config/api';
 
+interface Activity {
+  _id: string;
+  titulo: string;
+  descripcion: string;
+  fecha: string;
+  hora: string;
+  lugar: string;
+  estado: string;
+  categoria: string;
+  imagenes: string[];
+  objetivos: string[];
+  materiales: string[];
+  evaluacion: string;
+  observaciones: string;
+  participantes: any[];
+  creador: {
+    name: string;
+  };
+  institucion: {
+    _id: string;
+    nombre: string;
+  };
+  division?: {
+    _id: string;
+    nombre: string;
+  };
+}
 
-interface EventsCalendarProps {
+interface ActivitiesCalendarProps {
   selectedDivision: string;
-  onDateClick: (date: string, events: Event[]) => void;
+  onDateClick: (date: string, activities: Activity[]) => void;
 }
 
 interface CalendarDay {
   date: Date;
   isCurrentMonth: boolean;
   isToday: boolean;
-  events: Event[];
-  hasEvents: boolean;
+  activities: Activity[];
+  hasActivities: boolean;
 }
 
-export const EventsCalendar: React.FC<EventsCalendarProps> = ({
+export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
   selectedDivision,
   onDateClick
 }) => {
-  console.log('📅 [EVENTS_CALENDAR] Componente inicializado con división:', selectedDivision);
-  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,8 +64,7 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
 
   const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-  // Cargar eventos del mes actual
-  const loadMonthEvents = async (date: Date) => {
+  const loadMonthActivities = async (date: Date) => {
     if (!selectedDivision) return;
 
     try {
@@ -61,38 +82,33 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
         fechaFin: endDate.toISOString().split('T')[0]
       };
 
-      console.log('📅 [EVENTS_CALENDAR] Cargando eventos del mes para:', params);
+      console.log('📅 [ACTIVITIES_CALENDAR] Cargando actividades del mes para:', params);
 
-      const calendarData = await EventService.getCalendarData(params);
+      const response = await apiClient.get(`/backoffice/actividades/calendar?${new URLSearchParams(params).toString()}`);
+      const calendarData = response.data.data;
       
-      console.log('📅 [EVENTS_CALENDAR] Datos del calendario recibidos:', calendarData);
+      console.log('📅 [ACTIVITIES_CALENDAR] Datos del calendario recibidos:', calendarData);
 
-      // Generar días del calendario con los datos del calendario
       generateCalendarDays(date, calendarData);
 
     } catch (err: any) {
-      console.error('Error loading month events:', err);
-      setError(err.message || 'Error al cargar eventos del calendario');
+      console.error('Error loading month activities:', err);
+      setError(err.message || 'Error al cargar actividades del calendario');
     } finally {
       setLoading(false);
     }
   };
 
-  // Generar días del calendario con eventos
-  const generateCalendarDays = (date: Date, calendarData: { [fecha: string]: { fecha: string; totalEventos: number; eventos: Event[] } }) => {
+  const generateCalendarDays = (date: Date, calendarData: { [fecha: string]: { fecha: string; totalActividades: number; actividades: Activity[] } }) => {
     const year = date.getFullYear();
     const month = date.getMonth();
     const today = new Date();
     
-    // Primer día del mes
     const firstDay = new Date(year, month, 1);
-    // Último día del mes
     const lastDay = new Date(year, month + 1, 0);
-    // Primer día de la semana del primer día del mes
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
     
-    // Último día de la semana del último día del mes
     const endDate = new Date(lastDay);
     endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
     
@@ -102,22 +118,14 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
     while (currentDate <= endDate) {
       const dateString = currentDate.toISOString().split('T')[0];
       const dayData = calendarData[dateString];
-      const dayEvents = dayData ? dayData.eventos : [];
-      
-      // Debug: mostrar días con eventos
-      if (dayEvents.length > 0) {
-        console.log('📅 [EVENTS_CALENDAR] Día con eventos:', dateString, 'Eventos:', dayEvents.length);
-      }
-      
-      // Crear fecha local para evitar problemas de zona horaria
-      const localDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const dayActivities = dayData ? dayData.actividades : [];
       
       days.push({
-        date: localDate,
+        date: new Date(currentDate),
         isCurrentMonth: currentDate.getMonth() === month,
         isToday: currentDate.toDateString() === today.toDateString(),
-        events: dayEvents,
-        hasEvents: dayEvents.length > 0
+        activities: dayActivities,
+        hasActivities: dayActivities.length > 0
       });
       
       currentDate.setDate(currentDate.getDate() + 1);
@@ -126,59 +134,39 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
     setCalendarDays(days);
   };
 
-  // Navegar al mes anterior
   const goToPreviousMonth = () => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() - 1);
     setCurrentDate(newDate);
-    loadMonthEvents(newDate);
+    loadMonthActivities(newDate);
   };
 
-  // Navegar al mes siguiente
   const goToNextMonth = () => {
     const newDate = new Date(currentDate);
     newDate.setMonth(newDate.getMonth() + 1);
     setCurrentDate(newDate);
-    loadMonthEvents(newDate);
+    loadMonthActivities(newDate);
   };
 
-  // Manejar click en un día
   const handleDayClick = (day: CalendarDay) => {
-    // Usar fecha local para evitar problemas de zona horaria
-    const year = day.date.getFullYear();
-    const month = String(day.date.getMonth() + 1).padStart(2, '0');
-    const dayNum = String(day.date.getDate()).padStart(2, '0');
-    const dateString = `${year}-${month}-${dayNum}`;
-    
-    console.log('📅 [EVENTS_CALENDAR] Click en día - Fecha original:', day.date.toISOString());
-    console.log('📅 [EVENTS_CALENDAR] Click en día - Año:', year, 'Mes:', month, 'Día:', dayNum);
-    console.log('📅 [EVENTS_CALENDAR] Click en día - DateString:', dateString);
-    console.log('📅 [EVENTS_CALENDAR] Click en día - Eventos:', day.events);
-    onDateClick(dateString, day.events);
+    const dateString = day.date.toISOString().split('T')[0];
+    onDateClick(dateString, day.activities);
   };
 
-  // Cargar eventos cuando cambie la división o el mes
   useEffect(() => {
-    console.log('📅 [EVENTS_CALENDAR] useEffect ejecutado:', { selectedDivision, currentDate: currentDate.toISOString() });
     if (selectedDivision) {
-      console.log('📅 [EVENTS_CALENDAR] Cargando eventos para división:', selectedDivision);
-      loadMonthEvents(currentDate);
-    } else {
-      console.log('📅 [EVENTS_CALENDAR] No hay división seleccionada');
+      loadMonthActivities(currentDate);
     }
   }, [selectedDivision, currentDate]);
 
-  const getEventColor = (categoria: string) => {
+  const getActivityColor = (categoria: string) => {
     switch (categoria) {
-      case 'reunion': return 'bg-blue-500';
-      case 'taller': return 'bg-green-500';
-      case 'conferencia': return 'bg-purple-500';
-      case 'seminario': return 'bg-yellow-500';
-      case 'webinar': return 'bg-indigo-500';
-      case 'curso': return 'bg-pink-500';
-      case 'actividad_social': return 'bg-orange-500';
-      case 'deportivo': return 'bg-red-500';
-      case 'cultural': return 'bg-teal-500';
+      case 'academica': return 'bg-blue-500';
+      case 'deportiva': return 'bg-green-500';
+      case 'cultural': return 'bg-purple-500';
+      case 'recreativa': return 'bg-yellow-500';
+      case 'social': return 'bg-indigo-500';
+      case 'otra': return 'bg-gray-500';
       default: return 'bg-gray-500';
     }
   };
@@ -193,7 +181,6 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
-      {/* Header del calendario */}
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <div className="flex items-center space-x-4">
           <CalendarIcon className="h-6 w-6 text-blue-600" />
@@ -226,7 +213,6 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
         </div>
       )}
 
-      {/* Días de la semana */}
       <div className="grid grid-cols-7 border-b border-gray-200">
         {dayNames.map((day) => (
           <div key={day} className="p-3 text-center text-sm font-medium text-gray-500 bg-gray-50">
@@ -235,7 +221,6 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
         ))}
       </div>
 
-      {/* Días del calendario */}
       <div className="grid grid-cols-7">
         {calendarDays.map((day, index) => (
           <div
@@ -245,7 +230,7 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
               min-h-[120px] p-2 border-r border-b border-gray-200 cursor-pointer transition-colors
               ${day.isCurrentMonth ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 text-gray-400'}
               ${day.isToday ? 'bg-blue-50 border-blue-200' : ''}
-              ${day.hasEvents ? 'bg-green-50 border-green-200' : ''}
+              ${day.hasActivities ? 'bg-green-50 border-green-200' : ''}
             `}
           >
             <div className="flex items-center justify-between mb-1">
@@ -255,39 +240,38 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
               `}>
                 {day.date.getDate()}
               </span>
-              {day.hasEvents && (
+              {day.hasActivities && (
                 <div className="flex space-x-1">
-                  {day.events.slice(0, 2).map((event, eventIndex) => (
+                  {day.activities.slice(0, 2).map((activity, activityIndex) => (
                     <div
-                      key={eventIndex}
-                      className={`w-2 h-2 rounded-full ${getEventColor(event.categoria)}`}
-                      title={event.nombre}
+                      key={activityIndex}
+                      className={`w-2 h-2 rounded-full ${getActivityColor(activity.categoria)}`}
+                      title={activity.titulo}
                     />
                   ))}
-                  {day.events.length > 2 && (
-                    <div className="w-2 h-2 rounded-full bg-gray-400" title={`+${day.events.length - 2} más`} />
+                  {day.activities.length > 2 && (
+                    <div className="w-2 h-2 rounded-full bg-gray-400" title={`+${day.activities.length - 2} más`} />
                   )}
                 </div>
               )}
             </div>
             
-            {/* Mostrar eventos del día */}
             <div className="space-y-1">
-              {day.events.slice(0, 2).map((event) => (
+              {day.activities.slice(0, 2).map((activity) => (
                 <div
-                  key={event._id}
+                  key={activity._id}
                   className={`
                     text-xs p-1 rounded truncate
-                    ${getEventColor(event.categoria)} text-white
+                    ${getActivityColor(activity.categoria)} text-white
                   `}
-                  title={event.nombre}
+                  title={activity.titulo}
                 >
-                  {event.nombre}
+                  {activity.titulo}
                 </div>
               ))}
-              {day.events.length > 2 && (
+              {day.activities.length > 2 && (
                 <div className="text-xs text-gray-500">
-                  +{day.events.length - 2} más
+                  +{day.activities.length - 2} más
                 </div>
               )}
             </div>
@@ -295,25 +279,24 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
         ))}
       </div>
 
-      {/* Leyenda de colores */}
       <div className="p-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-4 text-sm">
           <span className="text-gray-600 font-medium">Leyenda:</span>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span>Reunión</span>
+            <span>Académica</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span>Taller</span>
+            <span>Deportiva</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-            <span>Conferencia</span>
+            <span>Cultural</span>
           </div>
           <div className="flex items-center space-x-2">
             <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span>Seminario</span>
+            <span>Recreativa</span>
           </div>
         </div>
       </div>

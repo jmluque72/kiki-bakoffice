@@ -211,4 +211,30 @@ export class NotificationService {
       return 0;
     }
   }
+
+  // Obtener datos del calendario de notificaciones
+  static async getCalendarData(params: {
+    divisionId?: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+  }): Promise<{ [fecha: string]: { fecha: string; totalNotificaciones: number; notificaciones: Notification[] } }> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.divisionId) queryParams.append('divisionId', params.divisionId);
+      if (params.fechaInicio) queryParams.append('fechaInicio', params.fechaInicio);
+      if (params.fechaFin) queryParams.append('fechaFin', params.fechaFin);
+
+      const response = await apiClient.get(
+        `/backoffice/notifications/calendar?${queryParams.toString()}`
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Error al obtener datos del calendario');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener datos del calendario');
+    }
+  }
 }

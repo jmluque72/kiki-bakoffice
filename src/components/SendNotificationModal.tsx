@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, Users, MessageSquare, Building2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useDivisions } from '../hooks/useDivisions';
 import { NotificationService, CreateNotificationRequest } from '../services/notificationService';
+import { apiClient } from '../config/api';
 import { grupoService } from '../services/grupoService';
 import { userService } from '../services/userService';
 import { AuthService } from '../services/authService';
@@ -33,8 +35,8 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
   onSuccess
 }) => {
   const { user } = useAuth();
+  const { divisions, loading: loadingDivisions, error: errorDivisions } = useDivisions();
   const [loading, setLoading] = useState(false);
-  const [divisions, setDivisions] = useState<Division[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedDivision, setSelectedDivision] = useState<string>('');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
@@ -49,13 +51,8 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
   console.log('🔍 [SendNotificationModal] Usuario:', user?.nombre);
   console.log('🔍 [SendNotificationModal] Rol:', user?.role?.nombre);
   console.log('🔍 [SendNotificationModal] Es accountadmin?', isAccountAdmin);
-
-  // Cargar divisiones al abrir el modal
-  useEffect(() => {
-    if (isOpen && isAccountAdmin) {
-      loadDivisions();
-    }
-  }, [isOpen, isAccountAdmin]);
+  console.log('🔍 [SendNotificationModal] Divisiones cargadas:', divisions.length);
+  console.log('🔍 [SendNotificationModal] Divisiones:', divisions);
 
   // Cargar estudiantes cuando se selecciona una división
   useEffect(() => {
@@ -67,133 +64,35 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
     }
   }, [selectedDivision]);
 
-  const loadDivisions = async () => {
-    try {
-      // Obtener accountId del usuario logueado
-      let accountId = user?.account?._id;
-      if (!accountId) {
-        const storedUser = localStorage.getItem('backoffice_user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          accountId = parsedUser.account?._id;
-        }
-      }
-      if (!accountId) {
-        try {
-          const profile = await AuthService.getProfile();
-          accountId = profile.account?._id;
-        } catch (error) {
-          console.log('🔍 [SendNotificationModal] Error obteniendo perfil en loadDivisions:', error);
-        }
-      }
-      if (!accountId) {
-        accountId = '68c09a0a342828fc206d7af0'; // San Martin - temporal
-      }
-      
-      console.log('🔍 [SendNotificationModal] Cargando divisiones para cuenta:', accountId);
-      console.log('🔍 [SendNotificationModal] Usuario actual:', user?.nombre);
-      
-      // Usar el servicio de grupos para obtener las divisiones
-      console.log('🔍 [SendNotificationModal] Llamando a grupoService.getGrupos con accountId:', accountId);
-      const gruposResponse = await grupoService.getGrupos(1, 100, '', accountId);
-      
-      console.log('🔍 [SendNotificationModal] Respuesta completa de grupos:', gruposResponse);
-      console.log('🔍 [SendNotificationModal] Grupos obtenidos:', gruposResponse.grupos);
-      console.log('🔍 [SendNotificationModal] Estructura del primer grupo:', gruposResponse.grupos[0]);
-      
-      // Filtrar solo los grupos que pertenecen a la cuenta del usuario
-      const gruposFiltrados = gruposResponse.grupos.filter(grupo => {
-        const matches = grupo.cuenta?._id === accountId;
-        console.log('🔍 [SendNotificationModal] Grupo:', grupo.nombre, 'Cuenta:', grupo.cuenta?._id, 'AccountId esperado:', accountId, 'Coincide:', matches);
-        return matches;
-      });
-      
-      console.log('🔍 [SendNotificationModal] Total grupos obtenidos:', gruposResponse.grupos.length);
-      console.log('🔍 [SendNotificationModal] Grupos filtrados:', gruposFiltrados.length);
-      
-      console.log('🔍 [SendNotificationModal] Grupos filtrados:', gruposFiltrados);
-      
-      // Convertir grupos a divisiones
-      const divisiones: Division[] = gruposFiltrados.map(grupo => ({
-        _id: grupo._id,
-        nombre: grupo.nombre
-      }));
-      
-      console.log('🔍 [SendNotificationModal] Divisiones finales:', divisiones);
-      
-      // TEMPORAL: Si no hay divisiones filtradas, usar datos mock específicos de San Martin
-      if (divisiones.length === 0) {
-        console.log('🔍 [SendNotificationModal] No se encontraron divisiones filtradas, usando datos mock');
-        const mockDivisions: Division[] = [
-          { _id: '68c09a1e342828fc206d7b5e', nombre: 'Sala Verde' }, // ID real de la división
-        ];
-        setDivisions(mockDivisions);
-      } else {
-        setDivisions(divisiones);
-      }
-    } catch (error) {
-      console.error('Error loading divisions:', error);
-      // Fallback a datos mock específicos de San Martin
-      const mockDivisions: Division[] = [
-        { _id: '68c09a1e342828fc206d7b5e', nombre: 'Sala Verde' }, // ID real de San Martin
-      ];
-      setDivisions(mockDivisions);
-    }
-  };
 
   const loadStudents = async (divisionId: string) => {
     try {
       setLoading(true);
       console.log('🔍 [SendNotificationModal] Cargando estudiantes para división:', divisionId);
       
-      // Obtener accountId del usuario logueado
-      let accountId = user?.account?._id;
-      if (!accountId) {
-        const storedUser = localStorage.getItem('backoffice_user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          accountId = parsedUser.account?._id;
-        }
+      // Usar el endpoint correcto para obtener estudiantes de una división
+      const response = await apiClient.get(`/students/division/${divisionId}`);
+      console.log('🔍 [SendNotificationModal] Respuesta de estudiantes:', response.data);
+      
+      if (response.data.success && response.data.data) {
+        const students = response.data.data.map((student: any) => ({
+          _id: student._id,
+          nombre: student.nombre || student.name,
+          email: student.email,
+          division: student.division
+        }));
+        
+        console.log('🔍 [SendNotificationModal] Estudiantes encontrados:', students.length);
+        setStudents(students);
+      } else {
+        console.log('🔍 [SendNotificationModal] No se encontraron estudiantes');
+        setStudents([]);
       }
-      if (!accountId) {
-        try {
-          const profile = await AuthService.getProfile();
-          accountId = profile.account?._id;
-        } catch (error) {
-          console.log('🔍 [SendNotificationModal] Error obteniendo perfil en loadStudents:', error);
-        }
-      }
-      if (!accountId) {
-        accountId = '68c09a0a342828fc206d7af0'; // San Martin - temporal
-      }
-      
-      // Obtener estudiantes reales de la división desde la colección Student
-      console.log('🔍 [SendNotificationModal] Obteniendo estudiantes reales de la división...');
-      
-      // Usar los IDs de estudiantes reales que encontramos en la verificación
-      const realStudents: Student[] = [
-        { _id: '68c09a41342828fc206d7b9e', nombre: 'Juan Pérez', email: 'juan.perez@example.com' },
-        { _id: '68c09a42342828fc206d7bbf', nombre: 'Ana López', email: 'ana.lopez@example.com' },
-        { _id: '68c09a43342828fc206d7be0', nombre: 'Carlos Rodríguez', email: 'carlos.rodriguez@example.com' },
-        { _id: '68c09a43342828fc206d7c01', nombre: 'Sofía García', email: 'sofia.garcia@example.com' },
-        { _id: '68c09a44342828fc206d7c22', nombre: 'Lucas Fernández', email: 'lucas.fernandez@example.com' },
-      ];
-      
-      console.log('🔍 [SendNotificationModal] Estudiantes reales encontrados:', realStudents.length);
-      console.log('🔍 [SendNotificationModal] Estudiantes:', realStudents);
-      
-      setStudents(realStudents);
       
     } catch (error) {
       console.error('Error loading students:', error);
-      // En caso de error, usar datos mock
-      console.log('🔍 [SendNotificationModal] Usando datos mock para estudiantes');
-      const mockStudents: Student[] = [
-        { _id: '68c09a0a342828fc206d7af1', nombre: 'Juan Pérez', email: 'juan@example.com' },
-        { _id: '68c09a0a342828fc206d7af2', nombre: 'María García', email: 'maria@example.com' },
-        { _id: '68c09a0a342828fc206d7af3', nombre: 'Carlos López', email: 'carlos@example.com' },
-      ];
-      setStudents(mockStudents);
+      console.log('🔍 [SendNotificationModal] Error cargando estudiantes, usando lista vacía');
+      setStudents([]);
     } finally {
       setLoading(false);
     }
@@ -233,10 +132,12 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
 
     // Obtener accountId del usuario logueado
     let accountId = user?.account?._id;
+    console.log('🔍 [SendNotificationModal] Account ID desde user.account:', accountId);
     
     // Si no está en el usuario, intentar obtenerlo del localStorage
     if (!accountId) {
       const storedUser = localStorage.getItem('backoffice_user');
+      console.log('🔍 [SendNotificationModal] Stored user desde localStorage:', storedUser);
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
         accountId = parsedUser.account?._id;
@@ -249,22 +150,54 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
       try {
         console.log('🔍 [SendNotificationModal] Obteniendo perfil del usuario para accountId...');
         const profile = await AuthService.getProfile();
+        console.log('🔍 [SendNotificationModal] Perfil completo:', profile);
         accountId = profile.account?._id;
         console.log('🔍 [SendNotificationModal] Account ID desde perfil:', accountId);
       } catch (error) {
         console.log('🔍 [SendNotificationModal] Error obteniendo perfil:', error);
+        console.log('🔍 [SendNotificationModal] Error details:', error.response?.data);
       }
     }
     
-    // Si aún no tenemos accountId, usar un valor por defecto temporal
+    // Si aún no tenemos accountId, obtenerlo desde las asociaciones del usuario
     if (!accountId) {
-      // TEMPORAL: Usar un accountId hardcodeado para testing
-      accountId = '68c09a0a342828fc206d7af0'; // San Martin
-      console.log('🔍 [SendNotificationModal] Usando accountId temporal:', accountId);
+      try {
+        console.log('🔍 [SendNotificationModal] Obteniendo cuenta desde asociaciones del usuario...');
+        const response = await apiClient.get('/shared/user');
+        console.log('🔍 [SendNotificationModal] Respuesta completa de /shared/user:', response.data);
+        
+        if (response.data.success && response.data.data) {
+          const associations = response.data.data;
+          console.log('🔍 [SendNotificationModal] Asociaciones del usuario:', associations);
+          
+          // Buscar la asociación activa del usuario
+          if (associations && associations.length > 0) {
+            const activeAssociation = associations.find(assoc => assoc.status === 'active');
+            console.log('🔍 [SendNotificationModal] Asociación activa encontrada:', activeAssociation);
+            if (activeAssociation && activeAssociation.account) {
+              accountId = activeAssociation.account._id;
+              console.log('🔍 [SendNotificationModal] Account ID desde asociación activa:', accountId);
+            }
+          } else {
+            console.log('🔍 [SendNotificationModal] No se encontraron asociaciones');
+          }
+        } else {
+          console.log('🔍 [SendNotificationModal] Respuesta no exitosa:', response.data);
+        }
+      } catch (error) {
+        console.log('🔍 [SendNotificationModal] Error obteniendo asociaciones:', error);
+        console.log('🔍 [SendNotificationModal] Error details:', error.response?.data);
+      }
     }
-
+    
+    // Si aún no tenemos accountId, mostrar error con información de debug
     if (!accountId) {
-      alert('Error: No se pudo obtener la información de la cuenta. Por favor, cierra sesión y vuelve a iniciar sesión.');
+      console.log('🔍 [SendNotificationModal] DEBUG - No se pudo obtener accountId');
+      console.log('🔍 [SendNotificationModal] Usuario completo:', user);
+      console.log('🔍 [SendNotificationModal] Email del usuario:', user?.email);
+      console.log('🔍 [SendNotificationModal] Account del usuario:', user?.account);
+      
+      alert(`Error: No se pudo obtener la información de la cuenta.\n\nDebug info:\n- Email: ${user?.email}\n- Account: ${JSON.stringify(user?.account)}\n\nPor favor, cierra sesión y vuelve a iniciar sesión.`);
       return;
     }
 
@@ -367,20 +300,33 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Building2 className="h-4 w-4 inline mr-1" />
-              Sala/División
+              División
             </label>
-            <select
-              value={selectedDivision}
-              onChange={(e) => setSelectedDivision(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Selecciona una sala</option>
-              {divisions.map((division) => (
-                <option key={division._id} value={division._id}>
-                  {division.nombre}
-                </option>
-              ))}
-            </select>
+            {loadingDivisions ? (
+              <div className="p-3 border border-gray-300 rounded-lg bg-gray-50">
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                  Cargando divisiones...
+                </div>
+              </div>
+            ) : errorDivisions ? (
+              <div className="p-3 border border-red-300 rounded-lg bg-red-50 text-red-600">
+                Error cargando divisiones: {errorDivisions}
+              </div>
+            ) : (
+              <select
+                value={selectedDivision}
+                onChange={(e) => setSelectedDivision(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Selecciona una división</option>
+                {divisions.map((division) => (
+                  <option key={division._id} value={division._id}>
+                    {division.nombre}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Selección de estudiantes */}
