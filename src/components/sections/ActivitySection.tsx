@@ -12,10 +12,12 @@ import { Notification } from '../Notification';
 import { useAuth } from '../../hooks/useAuth';
 import { ActivitiesCalendar } from '../ActivitiesCalendar';
 import { ActivityDayModal } from '../ActivityDayModal';
+import { useActivities } from '../../hooks/useActivities';
 
 export const ActivitySection: React.FC = () => {
   const { user } = useAuth();
   const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
+  const { changeActivityStatus } = useActivities();
 
   console.log('📅 [ACTIVIDADES] Componente renderizado');
   console.log('📅 [ACTIVIDADES] User:', user);
@@ -53,6 +55,36 @@ export const ActivitySection: React.FC = () => {
     setShowActivityModal(false);
     setSelectedDate('');
     setSelectedDateActivities([]);
+  };
+
+  // Manejar cambio de estado de actividad
+  const handleActivityStatusChange = async (activityId: string, newStatus: 'borrador' | 'publicada') => {
+    try {
+      const success = await changeActivityStatus(activityId, newStatus);
+      if (success) {
+        setNotificationMessage(`Actividad ${newStatus === 'publicada' ? 'publicada' : 'marcada como borrador'} correctamente`);
+        setNotificationType('success');
+        setShowNotification(true);
+        
+        // Actualizar la actividad en la lista local
+        setSelectedDateActivities(prev => 
+          prev.map(activity => 
+            activity._id === activityId 
+              ? { ...activity, estado: newStatus }
+              : activity
+          )
+        );
+      } else {
+        setNotificationMessage('Error al cambiar el estado de la actividad');
+        setNotificationType('error');
+        setShowNotification(true);
+      }
+    } catch (error) {
+      console.error('Error changing activity status:', error);
+      setNotificationMessage('Error al cambiar el estado de la actividad');
+      setNotificationType('error');
+      setShowNotification(true);
+    }
   };
 
   // Cerrar notificación
@@ -158,12 +190,13 @@ export const ActivitySection: React.FC = () => {
       )}
 
       {/* Modal de Actividades del Día */}
-      <ActivityDayModal
-        isOpen={showActivityModal}
-        onClose={handleCloseActivityModal}
-        date={selectedDate}
-        activities={selectedDateActivities}
-      />
+        <ActivityDayModal
+          isOpen={showActivityModal}
+          onClose={handleCloseActivityModal}
+          date={selectedDate}
+          activities={selectedDateActivities}
+          onStatusChange={handleActivityStatusChange}
+        />
 
       {/* Notificación */}
       {showNotification && (

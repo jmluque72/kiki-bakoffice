@@ -33,6 +33,7 @@ export const EventosSection: React.FC = () => {
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState<'success' | 'error'>('success');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Manejar selección de división
   const handleDivisionChange = (divisionId: string) => {
@@ -71,7 +72,7 @@ export const EventosSection: React.FC = () => {
     setNotificationMessage('Evento creado exitosamente');
     setNotificationType('success');
     // Refrescar el calendario para mostrar el nuevo evento
-    window.location.reload(); // Solución simple para refrescar todo
+    setRefreshKey(prev => prev + 1);
   };
 
   // Cerrar notificación
@@ -180,6 +181,7 @@ export const EventosSection: React.FC = () => {
         <>
           {console.log('📅 [EVENTOS_SECTION] Renderizando EventsCalendar con división:', selectedDivision)}
           <EventsCalendar
+            key={refreshKey}
             selectedDivision={selectedDivision}
             onDateClick={handleDateClick}
           />

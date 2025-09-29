@@ -79,6 +79,31 @@ export const useActivities = () => {
     }
   };
 
+  const changeActivityStatus = async (id: string, estado: 'borrador' | 'publicada'): Promise<boolean> => {
+    try {
+      setError(null);
+      
+      const response = await apiClient.patch(`${API_ENDPOINTS.ACTIVITIES.CHANGE_STATUS(id)}`, { estado });
+      
+      if (response.data.success) {
+        // Actualizar la actividad en la lista
+        setActivities(prev => prev.map(activity => 
+          activity._id === id 
+            ? { ...activity, estado }
+            : activity
+        ));
+        return true;
+      } else {
+        setError(response.data.message || 'Error al cambiar el estado de la actividad');
+        return false;
+      }
+    } catch (err: any) {
+      console.error('Error changing activity status:', err);
+      setError(err.response?.data?.message || 'Error al cambiar el estado de la actividad');
+      return false;
+    }
+  };
+
   return {
     activities,
     loading,
@@ -87,6 +112,7 @@ export const useActivities = () => {
     page,
     limit,
     fetchActivities,
-    deleteActivity
+    deleteActivity,
+    changeActivityStatus
   };
 }; 

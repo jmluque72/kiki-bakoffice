@@ -20,7 +20,7 @@ interface Activity {
   fecha: string;
   hora: string;
   lugar: string;
-  estado: string;
+  estado: 'borrador' | 'publicada';
   categoria: string;
   imagenes: string[];
   objetivos: string[];
@@ -46,13 +46,15 @@ interface ActivityDayModalProps {
   onClose: () => void;
   date: string;
   activities: Activity[];
+  onStatusChange?: (activityId: string, newStatus: 'borrador' | 'publicada') => void;
 }
 
 export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
   isOpen,
   onClose,
   date,
-  activities
+  activities,
+  onStatusChange
 }) => {
   if (!isOpen) return null;
 
@@ -73,6 +75,20 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
       case 'social': return 'bg-indigo-100 text-indigo-800';
       case 'otra': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusColor = (estado: 'borrador' | 'publicada') => {
+    switch (estado) {
+      case 'borrador': return 'bg-yellow-100 text-yellow-800';
+      case 'publicada': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleStatusChange = (activityId: string, newStatus: 'borrador' | 'publicada') => {
+    if (onStatusChange) {
+      onStatusChange(activityId, newStatus);
     }
   };
 
@@ -168,11 +184,25 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
 
                       <div className="flex items-center space-x-3">
                         <Clock className="h-5 w-5 text-gray-400" />
-                        <div>
+                        <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900">Estado</p>
-                          <p className="text-sm text-gray-600">
-                            {activity.estado}
-                          </p>
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(activity.estado)}`}>
+                              {activity.estado.charAt(0).toUpperCase() + activity.estado.slice(1)}
+                            </span>
+                            {onStatusChange && (
+                              <button
+                                onClick={() => handleStatusChange(activity._id, activity.estado === 'borrador' ? 'publicada' : 'borrador')}
+                                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                                  activity.estado === 'borrador' 
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                    : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                }`}
+                              >
+                                {activity.estado === 'borrador' ? 'Publicar' : 'Marcar como Borrador'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

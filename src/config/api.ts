@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { config } from './env';
 
 // Configuración base del API
-const API_BASE_URL = "https://api.kiki.com.ar";
+const API_BASE_URL = config.API_BASE_URL;
 
 // Crear instancia de axios con configuración base
 export const apiClient = axios.create({
@@ -132,6 +133,7 @@ export const API_ENDPOINTS = {
   ACTIVITIES: {
     LIST: '/api/activities',
     DELETE: (id: string) => `/api/activities/${id}`,
+    CHANGE_STATUS: (id: string) => `/activities/${id}/estado`,
   },
   
   // Health check
@@ -314,6 +316,7 @@ export interface Activity {
   ip?: string;
   userAgent?: string;
   activo: boolean;
+  estado: 'borrador' | 'publicada';
   createdAt: string;
   updatedAt: string;
 }
