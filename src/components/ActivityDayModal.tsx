@@ -47,6 +47,8 @@ interface ActivityDayModalProps {
   date: string;
   activities: Activity[];
   onStatusChange?: (activityId: string, newStatus: 'borrador' | 'publicada') => void;
+  onDelete?: (activityId: string) => void;
+  userRole?: string;
 }
 
 export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
@@ -54,7 +56,9 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
   onClose,
   date,
   activities,
-  onStatusChange
+  onStatusChange,
+  onDelete,
+  userRole
 }) => {
   if (!isOpen) return null;
 
@@ -89,6 +93,12 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
   const handleStatusChange = (activityId: string, newStatus: 'borrador' | 'publicada') => {
     if (onStatusChange) {
       onStatusChange(activityId, newStatus);
+    }
+  };
+
+  const handleDelete = (activityId: string) => {
+    if (onDelete) {
+      onDelete(activityId);
     }
   };
 
@@ -200,6 +210,14 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
                                 }`}
                               >
                                 {activity.estado === 'borrador' ? 'Publicar' : 'Marcar como Borrador'}
+                              </button>
+                            )}
+                            {onDelete && userRole === 'adminaccount' && (
+                              <button
+                                onClick={() => handleDelete(activity._id)}
+                                className="px-3 py-1 text-xs font-medium rounded-md bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                              >
+                                Eliminar
                               </button>
                             )}
                           </div>

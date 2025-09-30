@@ -180,7 +180,7 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border">
+    <div className="bg-white rounded-lg shadow-sm border w-full min-w-[800px]">
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <div className="flex items-center space-x-4">
           <CalendarIcon className="h-6 w-6 text-blue-600" />
@@ -227,7 +227,7 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
             key={index}
             onClick={() => handleDayClick(day)}
             className={`
-              min-h-[120px] p-2 border-r border-b border-gray-200 cursor-pointer transition-colors
+              min-h-[120px] min-w-[120px] p-2 border-r border-b border-gray-200 cursor-pointer transition-colors
               ${day.isCurrentMonth ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 text-gray-400'}
               ${day.isToday ? 'bg-blue-50 border-blue-200' : ''}
               ${day.hasActivities ? 'bg-green-50 border-green-200' : ''}
@@ -261,10 +261,15 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
                 <div
                   key={activity._id}
                   className={`
-                    text-xs p-1 rounded truncate
+                    text-xs p-1 rounded overflow-hidden text-ellipsis whitespace-nowrap
                     ${getActivityColor(activity.categoria)} text-white
                   `}
                   title={activity.titulo}
+                  style={{ 
+                    maxWidth: '100%',
+                    minWidth: '80px',
+                    display: 'block'
+                  }}
                 >
                   {activity.titulo}
                 </div>

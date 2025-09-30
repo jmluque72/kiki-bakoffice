@@ -17,7 +17,7 @@ import { useActivities } from '../../hooks/useActivities';
 export const ActivitySection: React.FC = () => {
   const { user } = useAuth();
   const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
-  const { changeActivityStatus } = useActivities();
+  const { changeActivityStatus, deleteActivity } = useActivities();
 
   console.log('📅 [ACTIVIDADES] Componente renderizado');
   console.log('📅 [ACTIVIDADES] User:', user);
@@ -48,6 +48,36 @@ export const ActivitySection: React.FC = () => {
     setShowActivityModal(true);
     
     console.log('📅 [ACTIVIDADES] Modal abierto:', true);
+  };
+
+  // Manejar eliminación de actividad
+  const handleDeleteActivity = async (activityId: string) => {
+    console.log('🗑️ [ACTIVIDADES] handleDeleteActivity llamado');
+    console.log('🗑️ [ACTIVIDADES] ActivityId:', activityId);
+    
+    try {
+      const success = await deleteActivity(activityId);
+      
+      if (success) {
+        setNotificationMessage('Actividad eliminada correctamente');
+        setNotificationType('success');
+        setShowNotification(true);
+        
+        // Remover la actividad de la lista local
+        setSelectedDateActivities(prev => 
+          prev.filter(activity => activity._id !== activityId)
+        );
+      } else {
+        setNotificationMessage('Error al eliminar la actividad');
+        setNotificationType('error');
+        setShowNotification(true);
+      }
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      setNotificationMessage('Error al eliminar la actividad');
+      setNotificationType('error');
+      setShowNotification(true);
+    }
   };
 
   // Cerrar modal del día
@@ -196,6 +226,8 @@ export const ActivitySection: React.FC = () => {
           date={selectedDate}
           activities={selectedDateActivities}
           onStatusChange={handleActivityStatusChange}
+          onDelete={handleDeleteActivity}
+          userRole={user?.role?.nombre}
         />
 
       {/* Notificación */}

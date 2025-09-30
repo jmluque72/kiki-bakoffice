@@ -132,7 +132,7 @@ export const API_ENDPOINTS = {
   },
   ACTIVITIES: {
     LIST: '/api/activities',
-    DELETE: (id: string) => `/api/activities/${id}`,
+    DELETE: (id: string) => `/backoffice/actividades/${id}`,
     CHANGE_STATUS: (id: string) => `/activities/${id}/estado`,
   },
   
