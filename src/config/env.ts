@@ -1,6 +1,7 @@
 // Configuración de variables de entorno
 export const config = {
   // API
+  //API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://192.168.68.111:3000',
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://api.kiki.com.ar',
   
   // AWS S3 (para URLs de imágenes)

@@ -7,6 +7,7 @@ import {
   Users, 
   User, 
   Image as ImageIcon,
+  Video,
   List,
   CheckSquare,
   Clipboard,
@@ -60,6 +61,59 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
   onDelete,
   userRole
 }) => {
+  // Función para detectar si una URL es un video
+  const isVideo = (url: string): boolean => {
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    
+    // Verificar por extensión de archivo
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.webm', '.m4v', '.quicktime'];
+    const hasVideoExtension = videoExtensions.some(ext => urlLower.includes(ext));
+    
+    // Verificar por patrones de URL de S3 que contengan videos
+    const isS3Video = urlLower.includes('uploads/') && (
+      urlLower.includes('.mp4') || 
+      urlLower.includes('.mov') || 
+      urlLower.includes('.avi') ||
+      urlLower.includes('.mkv') ||
+      urlLower.includes('.wmv') ||
+      urlLower.includes('.flv') ||
+      urlLower.includes('.webm') ||
+      urlLower.includes('.m4v') ||
+      urlLower.includes('.quicktime')
+    );
+    
+    // Verificar por parámetros de query que indiquen video
+    const hasVideoParams = urlLower.includes('contenttype=video') || 
+                          urlLower.includes('content-type=video') ||
+                          urlLower.includes('type=video');
+    
+    return hasVideoExtension || isS3Video || hasVideoParams;
+  };
+
+  // Separar imágenes y videos
+  const separateMedia = (mediaUrls: string[]) => {
+    const images: string[] = [];
+    const videos: string[] = [];
+    
+    console.log('🎬 [ACTIVITY_MODAL] Separando medios:', mediaUrls);
+    
+    mediaUrls.forEach((url, index) => {
+      const isVideoResult = isVideo(url);
+      console.log(`🎬 [ACTIVITY_MODAL] URL ${index + 1}:`, url);
+      console.log(`🎬 [ACTIVITY_MODAL] Es video:`, isVideoResult);
+      
+      if (isVideoResult) {
+        videos.push(url);
+      } else {
+        images.push(url);
+      }
+    });
+    
+    console.log('🎬 [ACTIVITY_MODAL] Resultado separación:', { images: images.length, videos: videos.length });
+    
+    return { images, videos };
+  };
   if (!isOpen) return null;
 
   const formatDate = (dateString: string) => {
@@ -226,25 +280,60 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Images */}
-                  {activity.imagenes && activity.imagenes.length > 0 && (
-                    <div className="border-t border-gray-200 pt-4 mt-4">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <ImageIcon className="h-5 w-5 text-gray-400" />
-                        <h4 className="text-sm font-medium text-gray-900">Imágenes ({activity.imagenes.length})</h4>
+                  {/* Media (Images and Videos) */}
+                  {activity.imagenes && activity.imagenes.length > 0 && (() => {
+                    const { images, videos } = separateMedia(activity.imagenes);
+                    return (
+                      <div className="border-t border-gray-200 pt-4 mt-4">
+                        {/* Images */}
+                        {images.length > 0 && (
+                          <div className="mb-4">
+                            <div className="flex items-center space-x-2 mb-3">
+                              <ImageIcon className="h-5 w-5 text-gray-400" />
+                              <h4 className="text-sm font-medium text-gray-900">Imágenes ({images.length})</h4>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                              {images.map((image, index) => (
+                                <img
+                                  key={index}
+                                  src={image}
+                                  alt={`Actividad imagen ${index + 1}`}
+                                  className="w-full h-24 object-cover rounded-lg shadow-sm"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Videos */}
+                        {videos.length > 0 && (
+                          <div>
+                            <div className="flex items-center space-x-2 mb-3">
+                              <Video className="h-5 w-5 text-gray-400" />
+                              <h4 className="text-sm font-medium text-gray-900">Videos ({videos.length})</h4>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {videos.map((video, index) => (
+                                <div key={index} className="relative">
+                                  <video
+                                    src={video}
+                                    controls
+                                    className="w-full h-48 object-cover rounded-lg shadow-sm"
+                                    preload="metadata"
+                                  >
+                                    Tu navegador no soporta la reproducción de videos.
+                                  </video>
+                                  <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                                    Video {index + 1}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {activity.imagenes.map((image, index) => (
-                          <img
-                            key={index}
-                            src={image}
-                            alt={`Actividad imagen ${index + 1}`}
-                            className="w-full h-24 object-cover rounded-lg shadow-sm"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Objectives */}
                   {activity.objetivos && activity.objetivos.length > 0 && (

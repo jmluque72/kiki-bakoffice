@@ -17,7 +17,8 @@ import {
   UserCheck,
   UserPlus,
   Bell,
-  Shield
+  Shield,
+  FolderOpen
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -50,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
     { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
     { icon: Clock, label: 'Asistencias', key: 'asistencias' },
     { icon: Shield, label: 'Quién Retira', key: 'pickup' },
+    ...(user?.role?.nombre === 'adminaccount' ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }] : []),
   ];
 
   const handleSectionClick = (sectionKey: string) => {

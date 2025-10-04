@@ -14,6 +14,7 @@ import { AsistenciasSection } from './sections/AsistenciasSection';
 import { StudentsSection } from './sections/StudentsSection';
 import CoordinadoresSection from './sections/CoordinadoresSection';
 import TutoresSection from './sections/TutoresSection';
+import { DocumentsSection } from './sections/DocumentsSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -24,6 +25,12 @@ export const Dashboard: React.FC = () => {
   const renderContent = () => {
     // Si el usuario no es superadmin y trata de acceder a accounts, redirigir a divisiones
     if (activeSection === 'accounts' && user?.role?.nombre !== 'superadmin') {
+      setActiveSection('divisiones');
+      return <GruposSection userRole={user?.role?.nombre || ''} />;
+    }
+
+    // Si el usuario no es adminaccount y trata de acceder a documentos, redirigir a divisiones
+    if (activeSection === 'documentos' && user?.role?.nombre !== 'adminaccount') {
       setActiveSection('divisiones');
       return <GruposSection userRole={user?.role?.nombre || ''} />;
     }
@@ -60,6 +67,8 @@ export const Dashboard: React.FC = () => {
         return <StudentsSection />;
       case 'pickup':
         return <PickupSection />;
+      case 'documentos':
+        return <DocumentsSection />;
       case 'dashboard':
       default:
         return <DashboardContent />;

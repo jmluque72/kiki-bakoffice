@@ -30,14 +30,32 @@ export const useAuthProvider = () => {
     const initializeAuth = async () => {
       try {
         const token = AuthService.getToken();
+        console.log('🔍 [useAuth] Token encontrado:', !!token);
         if (token) {
           // Verificar si el token es válido obteniendo el perfil
+          console.log('🔍 [useAuth] Obteniendo perfil...');
           const profile = await AuthService.getProfile();
+          console.log('🔍 [useAuth] Perfil obtenido:', profile);
           setUser(profile);
         }
       } catch (error) {
-        // Token inválido, limpiar localStorage
-        AuthService.logout();
+        console.error('❌ [useAuth] Error obteniendo perfil:', error);
+        
+        // Fallback: intentar cargar usuario desde localStorage
+        try {
+          const savedUser = localStorage.getItem('backoffice_user');
+          if (savedUser) {
+            const userData = JSON.parse(savedUser);
+            console.log('🔍 [useAuth] Usuario desde localStorage:', userData);
+            setUser(userData);
+          } else {
+            // Token inválido, limpiar localStorage
+            AuthService.logout();
+          }
+        } catch (localError) {
+          console.error('❌ [useAuth] Error cargando usuario desde localStorage:', localError);
+          AuthService.logout();
+        }
       } finally {
         setIsLoading(false);
       }

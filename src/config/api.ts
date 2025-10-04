@@ -54,7 +54,7 @@ export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: '/api/users/login',
     REGISTER: '/api/users/register',
-    PROFILE: '/api/users/profile',
+    PROFILE: '/users/profile',
   },
   
   // Usuarios

@@ -59,12 +59,15 @@ export class AuthService {
 
   static async getProfile(): Promise<User> {
     try {
+      console.log('🔍 [AuthService] Llamando endpoint:', API_ENDPOINTS.AUTH.PROFILE);
       const response = await apiClient.get<ApiResponse<User>>(
         API_ENDPOINTS.AUTH.PROFILE
       );
       
+      console.log('🔍 [AuthService] Respuesta del endpoint:', response.data);
       return response.data.data!;
     } catch (error: any) {
+      console.error('❌ [AuthService] Error en getProfile:', error);
       throw new Error(error.response?.data?.message || 'Error al obtener perfil');
     }
   }
