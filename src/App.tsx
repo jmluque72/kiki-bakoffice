@@ -7,6 +7,7 @@ import { Dashboard } from './components/Dashboard';
 const AppContent: React.FC = () => {
   const { user, isLoading } = useAuth();
 
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">

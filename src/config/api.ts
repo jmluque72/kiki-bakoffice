@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { config } from './env';
+import RefreshTokenService from '../services/refreshTokenService';
 
 // Configuración base del API
-const API_BASE_URL = config.API_BASE_URL;
+const API_BASE_URL = config.getApiUrl();
 
 // Crear instancia de axios con configuración base
 export const apiClient = axios.create({
@@ -16,7 +17,8 @@ export const apiClient = axios.create({
 // Interceptor para agregar token de autenticación
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('kiki_token');
+    // Usar el access token del refresh token service
+    const token = RefreshTokenService.getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -33,17 +35,61 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Interceptor para manejar errores de respuesta
+// Interceptor para manejar errores de respuesta con refresh automático
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expirado o inválido - solo limpiar localStorage
-      // No recargar la página automáticamente
+  (response) => {
+    // Verificar si el servidor envió un nuevo token
+    const newToken = response.headers['x-new-access-token'];
+    if (newToken) {
+      console.log('🔄 [API] Nuevo access token recibido del servidor');
+      localStorage.setItem('kiki_access_token', newToken);
+    }
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Solo manejar refresh automático para errores 401 en endpoints autenticados
+    // No interferir con errores de login (que también devuelven 401)
+    if (error.response?.status === 401 && 
+        error.config?.url !== '/api/users/login' && 
+        error.config?.url !== '/api/auth/refresh' && 
+        !originalRequest._retry) {
+      
+      console.log('🔄 [API] Token expirado, intentando refresh automático...');
+      
+      try {
+        // Marcar la request como retry para evitar loops
+        originalRequest._retry = true;
+        
+        // Intentar refresh del token
+        const newAccessToken = await RefreshTokenService.refreshAccessToken();
+        
+        if (newAccessToken) {
+          console.log('✅ [API] Token renovado exitosamente');
+          
+          // Actualizar el token en la request original
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          
+          // Reintentar la request original
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('❌ [API] Error en refresh automático:', refreshError);
+      }
+      
+      // Si el refresh falla, hacer logout
+      console.log('🔐 [API] Refresh falló - Redirigiendo al login');
+      
+      // Limpiar tokens
+      RefreshTokenService.clearTokens();
       localStorage.removeItem('kiki_token');
       localStorage.removeItem('backoffice_user');
-      console.log('Token expirado o inválido - limpiando localStorage');
+      
+      // Redirigir al login
+      window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );

@@ -25,6 +25,21 @@ export const useAuthProvider = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Función para validar si el usuario tiene acceso al backoffice
+  const validateBackofficeAccess = (user: User): boolean => {
+    const allowedRoles = ['superadmin', 'adminaccount'];
+    const userRole = user.role?.nombre || user.role;
+    
+    console.log('🔍 [useAuth] Validando acceso al backoffice...');
+    console.log('🔍 [useAuth] Rol del usuario:', userRole);
+    console.log('🔍 [useAuth] Roles permitidos:', allowedRoles);
+    
+    const hasAccess = allowedRoles.includes(userRole);
+    console.log('🔍 [useAuth] ¿Tiene acceso?', hasAccess);
+    
+    return hasAccess;
+  };
+
   // Cargar usuario inicial
   useEffect(() => {
     const initializeAuth = async () => {
@@ -36,7 +51,16 @@ export const useAuthProvider = () => {
           console.log('🔍 [useAuth] Obteniendo perfil...');
           const profile = await AuthService.getProfile();
           console.log('🔍 [useAuth] Perfil obtenido:', profile);
-          setUser(profile);
+          
+          // Validar acceso al backoffice
+          if (validateBackofficeAccess(profile)) {
+            setUser(profile);
+            console.log('✅ [useAuth] Usuario autorizado para el backoffice');
+          } else {
+            console.log('❌ [useAuth] Usuario no autorizado para el backoffice');
+            setError('No tienes permisos para acceder al backoffice. Solo usuarios con rol superadmin o adminaccount pueden acceder.');
+            AuthService.logout();
+          }
         }
       } catch (error) {
         console.error('❌ [useAuth] Error obteniendo perfil:', error);
@@ -47,7 +71,15 @@ export const useAuthProvider = () => {
           if (savedUser) {
             const userData = JSON.parse(savedUser);
             console.log('🔍 [useAuth] Usuario desde localStorage:', userData);
-            setUser(userData);
+            
+            // Validar acceso al backoffice también para usuarios guardados
+            if (validateBackofficeAccess(userData)) {
+              setUser(userData);
+            } else {
+              console.log('❌ [useAuth] Usuario guardado no autorizado para el backoffice');
+              setError('No tienes permisos para acceder al backoffice. Solo usuarios con rol superadmin o adminaccount pueden acceder.');
+              AuthService.logout();
+            }
           } else {
             // Token inválido, limpiar localStorage
             AuthService.logout();
@@ -70,8 +102,18 @@ export const useAuthProvider = () => {
     
     try {
       const response = await AuthService.login({ email, password });
-      setUser(response.user);
-      return true;
+      
+      // Validar acceso al backoffice después del login
+      if (validateBackofficeAccess(response.user)) {
+        setUser(response.user);
+        console.log('✅ [useAuth] Login exitoso con acceso autorizado al backoffice');
+        return true;
+      } else {
+        console.log('❌ [useAuth] Login exitoso pero sin acceso al backoffice');
+        setError('No tienes permisos para acceder al backoffice. Solo usuarios con rol superadmin o adminaccount pueden acceder.');
+        AuthService.logout();
+        return false;
+      }
     } catch (error: any) {
       setError(error.message);
       return false;

@@ -15,6 +15,7 @@ import { StudentsSection } from './sections/StudentsSection';
 import CoordinadoresSection from './sections/CoordinadoresSection';
 import TutoresSection from './sections/TutoresSection';
 import { DocumentsSection } from './sections/DocumentsSection';
+import { StudentActionsSection } from './sections/StudentActionsSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -63,6 +64,8 @@ export const Dashboard: React.FC = () => {
         return <TutoresSection userRole={user?.role?.nombre || ''} />;
       case 'asistencias':
         return <AsistenciasSection />;
+      case 'acciones-diarias':
+        return <StudentActionsSection />;
       case 'alumnos':
         return <StudentsSection />;
       case 'pickup':

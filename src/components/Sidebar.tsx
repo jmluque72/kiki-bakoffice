@@ -18,7 +18,8 @@ import {
   UserPlus,
   Bell,
   Shield,
-  FolderOpen
+  FolderOpen,
+  ClipboardList
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -50,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
     { icon: UserPlus, label: 'Tutores', key: 'tutores' },
     { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
     { icon: Clock, label: 'Asistencias', key: 'asistencias' },
+    { icon: ClipboardList, label: 'Acciones Diarias', key: 'acciones-diarias' },
     { icon: Shield, label: 'Quién Retira', key: 'pickup' },
     ...(user?.role?.nombre === 'adminaccount' ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }] : []),
   ];
