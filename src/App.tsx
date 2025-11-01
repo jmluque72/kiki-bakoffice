@@ -3,10 +3,13 @@ import { AuthProvider } from './contexts/AuthProvider';
 import { useAuth } from './hooks/useAuth';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
+import { useTokenRefresh } from './hooks/useTokenRefresh';
 
 const AppContent: React.FC = () => {
   const { user, isLoading } = useAuth();
-
+  
+  // Activar refresh automático del token
+  useTokenRefresh();
 
   if (isLoading) {
     return (

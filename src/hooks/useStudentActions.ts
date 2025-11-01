@@ -31,7 +31,10 @@ export const useStudentActions = (divisionId?: string) => {
   const createAction = async (actionData: CreateStudentActionRequest) => {
     try {
       const newAction = await studentActionService.createAction(actionData);
-      setActions(prev => [...prev, newAction]);
+      // Solo agregar a la lista si pertenece a la división seleccionada o si no hay filtro de división
+      if (!divisionId || newAction.division === divisionId) {
+        setActions(prev => [...prev, newAction]);
+      }
       return newAction;
     } catch (err) {
       setError('Error al crear la acción');
@@ -84,7 +87,12 @@ export const useStudentActions = (divisionId?: string) => {
 
   // Cargar acciones cuando cambie la división
   useEffect(() => {
-    loadActions();
+    if (divisionId) {
+      loadActions();
+    } else {
+      // Limpiar acciones si no hay división seleccionada
+      setActions([]);
+    }
   }, [divisionId]);
 
   return {

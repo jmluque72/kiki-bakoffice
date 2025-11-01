@@ -14,9 +14,22 @@ export const apiClient = axios.create({
   },
 });
 
-// Interceptor para agregar token de autenticación
+// Interceptor para agregar token de autenticación y refrescar si es necesario
 apiClient.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Verificar si el token está próximo a expirar antes de hacer la request
+    if (RefreshTokenService.hasValidTokens() && RefreshTokenService.isTokenExpiringSoon(2)) {
+      console.log('🔄 [API] Token próximo a expirar, renovando antes de request...');
+      try {
+        const newToken = await RefreshTokenService.refreshAccessToken();
+        if (newToken) {
+          console.log('✅ [API] Token renovado antes de request');
+        }
+      } catch (error) {
+        console.error('❌ [API] Error renovando token antes de request:', error);
+      }
+    }
+
     // Usar el access token del refresh token service
     const token = RefreshTokenService.getAccessToken();
     if (token) {

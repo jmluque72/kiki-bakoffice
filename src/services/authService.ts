@@ -26,16 +26,27 @@ export interface LoginResponse {
 export class AuthService {
   static async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
-      console.log('🔍 [AUTH SERVICE] Iniciando login...');
+      console.log('🔍 [AUTH SERVICE] Iniciando login con MongoDB...');
+      console.log('🔍 [AUTH SERVICE] Endpoint:', '/auth/cognito-login');
+      console.log('🔍 [AUTH SERVICE] Email:', credentials.email);
+      console.log('🔍 [AUTH SERVICE] API Base URL:', apiClient.defaults.baseURL);
       
-      // Usar endpoint de MongoDB
+      // Usar endpoint de login para backoffice (MongoDB)
+      // NOTA: El endpoint se llama "cognito-login" por razones de compatibilidad histórica,
+      // pero ahora usa MongoDB, NO Cognito
       const response = await apiClient.post<ApiResponse<LoginResponse>>(
-        '/auth/cognito-login', // Endpoint que ahora usa MongoDB
+        '/auth/cognito-login', // Endpoint de login para backoffice usando MongoDB
         credentials
       );
       
+      console.log('📦 [AUTH SERVICE] Respuesta recibida:', {
+        success: response.data.success,
+        hasData: !!response.data.data,
+        hasToken: !!response.data.data?.accessToken
+      });
+      
       if (response.data.success) {
-        console.log('✅ [AUTH SERVICE] Login exitoso');
+        console.log('✅ [AUTH SERVICE] Login exitoso con MongoDB');
         
         // Guardar tokens usando el refresh token service
         RefreshTokenService.saveTokens({
@@ -48,11 +59,16 @@ export class AuthService {
         localStorage.setItem('kiki_token', response.data.data!.accessToken);
         localStorage.setItem('backoffice_user', JSON.stringify(response.data.data!.user));
         localStorage.setItem('auth_source', 'mongodb'); // Marcar como autenticación con MongoDB
+        
+        console.log('✅ [AUTH SERVICE] Tokens guardados correctamente');
       }
       
       return response.data.data!;
     } catch (error: any) {
       console.error('❌ [AUTH SERVICE] Error en login:', error);
+      console.error('❌ [AUTH SERVICE] Error response:', error.response?.data);
+      console.error('❌ [AUTH SERVICE] Error status:', error.response?.status);
+      console.error('❌ [AUTH SERVICE] Error URL:', error.config?.url);
       throw new Error(error.response?.data?.message || 'Error al iniciar sesión');
     }
   }

@@ -4,11 +4,11 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useStudentActions } from '../hooks/useStudentActions';
 import { useDivisions } from '../hooks/useDivisions';
-import { Trash2, Edit, Eye, EyeOff, Plus, RefreshCw } from 'lucide-react';
+import { Trash2, Edit, Eye, EyeOff, Plus, RefreshCw, Building2 } from 'lucide-react';
 
 interface StudentAction {
   _id: string;
@@ -34,6 +34,8 @@ interface StudentActionForm {
 }
 
 const StudentActionsManagement: React.FC = () => {
+  const [selectedDivisionForManagement, setSelectedDivisionForManagement] = useState<string>('');
+  
   const { 
     actions, 
     loading, 
@@ -42,7 +44,7 @@ const StudentActionsManagement: React.FC = () => {
     deleteAction, 
     toggleActionStatus,
     loadActions 
-  } = useStudentActions();
+  } = useStudentActions(selectedDivisionForManagement);
   
   const { divisions, loadDivisions } = useDivisions();
   
@@ -53,9 +55,9 @@ const StudentActionsManagement: React.FC = () => {
   const [actionToDelete, setActionToDelete] = useState<StudentAction | null>(null);
   
   // Filtros
-  const [selectedDivision, setSelectedDivision] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedDivision, setSelectedDivision] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
   
   // Formulario
   const [formData, setFormData] = useState<StudentActionForm>({
@@ -68,15 +70,26 @@ const StudentActionsManagement: React.FC = () => {
     activo: true
   });
 
+  // Validación
+  const [errors, setErrors] = useState<Partial<Record<keyof StudentActionForm, string>>>({});
+
   useEffect(() => {
-    loadActions();
     loadDivisions();
   }, []);
 
+  useEffect(() => {
+    if (selectedDivisionForManagement) {
+      loadActions();
+    } else {
+      // Limpiar acciones si no hay división seleccionada
+      // No podemos modificar directamente, pero el hook manejará esto
+    }
+  }, [selectedDivisionForManagement]);
+
   const filteredActions = actions.filter(action => {
-    const divisionMatch = !selectedDivision || action.division === selectedDivision;
-    const categoryMatch = !selectedCategory || action.categoria === selectedCategory;
-    const statusMatch = !selectedStatus || 
+    const divisionMatch = !selectedDivision || selectedDivision === 'all' || action.division === selectedDivision;
+    const categoryMatch = !selectedCategory || selectedCategory === 'all' || action.categoria === selectedCategory;
+    const statusMatch = !selectedStatus || selectedStatus === 'all' ||
       (selectedStatus === 'activo' && action.activo) ||
       (selectedStatus === 'inactivo' && !action.activo);
     
@@ -111,15 +124,19 @@ const StudentActionsManagement: React.FC = () => {
   };
 
   const handleCreate = () => {
+    if (!selectedDivisionForManagement) {
+      return;
+    }
     setFormData({
       nombre: '',
       descripcion: '',
-      division: '',
-      categoria: '',
+      division: selectedDivisionForManagement, // Pre-llenar con la división seleccionada
+      categoria: 'otro', // Valor por defecto, no se muestra en el formulario
       color: '#0E5FCE',
       orden: 0,
       activo: true
     });
+    setErrors({});
     setShowCreateModal(true);
   };
 
@@ -133,6 +150,7 @@ const StudentActionsManagement: React.FC = () => {
       orden: action.orden,
       activo: action.activo
     });
+    setErrors({});
     setEditingAction(action);
     setShowEditModal(true);
   };
@@ -142,7 +160,30 @@ const StudentActionsManagement: React.FC = () => {
     setShowDeleteModal(true);
   };
 
+  const validateForm = (): boolean => {
+    const newErrors: Partial<Record<keyof StudentActionForm, string>> = {};
+    
+    if (!formData.nombre.trim()) {
+      newErrors.nombre = 'El nombre es obligatorio';
+    }
+    
+    if (!formData.division) {
+      newErrors.division = 'La división es obligatoria';
+    }
+    
+    if (!formData.color || !formData.color.match(/^#[0-9A-Fa-f]{6}$/)) {
+      newErrors.color = 'El color debe ser un código hexadecimal válido (ej: #0E5FCE)';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = async () => {
+    if (!validateForm()) {
+      return;
+    }
+    
     try {
       if (editingAction) {
         await updateAction(editingAction._id, formData);
@@ -152,6 +193,7 @@ const StudentActionsManagement: React.FC = () => {
       setShowCreateModal(false);
       setShowEditModal(false);
       setEditingAction(null);
+      setErrors({});
     } catch (error) {
       console.error('Error saving action:', error);
     }
@@ -178,24 +220,73 @@ const StudentActionsManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-blue-600">Gestión de Acciones de Estudiantes</h1>
         <div className="flex gap-2">
-          <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+          <Button 
+            onClick={handleCreate} 
+            className="bg-blue-600 hover:bg-blue-700"
+            disabled={!selectedDivisionForManagement}
+          >
             <Plus className="w-4 h-4 mr-2" />
             Nueva Acción
           </Button>
-          <Button onClick={loadActions} variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Actualizar
-          </Button>
+          {selectedDivisionForManagement && (
+            <Button onClick={loadActions} variant="outline">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Actualizar
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Selector de División */}
       <Card className="p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Label htmlFor="division-select-management" className="block text-sm font-medium text-gray-700 mb-2">
+          Seleccionar División *
+        </Label>
+        <Select 
+          value={selectedDivisionForManagement} 
+          onValueChange={(value) => {
+            setSelectedDivisionForManagement(value);
+            setSelectedDivision('all');
+            setSelectedCategory('all');
+            setSelectedStatus('all');
+          }}
+        >
+          <SelectTrigger id="division-select-management" className="w-full max-w-md">
+            <SelectValue placeholder="Selecciona una división para gestionar sus acciones" />
+          </SelectTrigger>
+          <SelectContent>
+            {divisions.map(division => (
+              <SelectItem key={division._id} value={division._id}>
+                {division.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedDivisionForManagement && (
+          <p className="mt-2 text-sm text-gray-600">
+            División seleccionada: {divisions.find(d => d._id === selectedDivisionForManagement)?.nombre}
+          </p>
+        )}
+      </Card>
+
+      {/* Mensaje si no hay división seleccionada */}
+      {!selectedDivisionForManagement && (
+        <Card className="p-12 text-center">
+          <div className="flex flex-col items-center justify-center">
+            <Building2 className="w-16 h-16 text-gray-400 mb-4" />
+            <p className="text-gray-600 text-lg">Selecciona una división para gestionar sus acciones</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Filtros - Solo visible si hay división seleccionada */}
+      {selectedDivisionForManagement && (
+        <Card className="p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <Label htmlFor="division-filter">División</Label>
             <Select value={selectedDivision} onValueChange={setSelectedDivision}>
@@ -203,7 +294,7 @@ const StudentActionsManagement: React.FC = () => {
                 <SelectValue placeholder="Todas las divisiones" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las divisiones</SelectItem>
+                <SelectItem value="all">Todas las divisiones</SelectItem>
                 {divisions.map(division => (
                   <SelectItem key={division._id} value={division._id}>
                     {division.nombre}
@@ -220,7 +311,7 @@ const StudentActionsManagement: React.FC = () => {
                 <SelectValue placeholder="Todas las categorías" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las categorías</SelectItem>
+                <SelectItem value="all">Todas las categorías</SelectItem>
                 <SelectItem value="alimentacion">Alimentación</SelectItem>
                 <SelectItem value="higiene">Higiene</SelectItem>
                 <SelectItem value="descanso">Descanso</SelectItem>
@@ -237,7 +328,7 @@ const StudentActionsManagement: React.FC = () => {
                 <SelectValue placeholder="Todos los estados" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los estados</SelectItem>
+                <SelectItem value="all">Todos los estados</SelectItem>
                 <SelectItem value="activo">Activo</SelectItem>
                 <SelectItem value="inactivo">Inactivo</SelectItem>
               </SelectContent>
@@ -245,9 +336,11 @@ const StudentActionsManagement: React.FC = () => {
           </div>
         </div>
       </Card>
+      )}
 
-      {/* Tabla de acciones */}
-      <Card>
+      {/* Tabla de acciones - Solo visible si hay división seleccionada */}
+      {selectedDivisionForManagement && (
+        <Card>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -346,6 +439,14 @@ const StudentActionsManagement: React.FC = () => {
           </table>
         </div>
       </Card>
+      )}
+
+      {selectedDivisionForManagement && actions.length === 0 && !loading && (
+        <Card className="p-12 text-center">
+          <p className="text-gray-600">No hay acciones configuradas para esta división</p>
+          <p className="text-sm text-gray-500 mt-2">Crea una nueva acción usando el botón "Nueva Acción"</p>
+        </Card>
+      )}
 
       {/* Modal para crear/editar */}
       <Dialog open={showCreateModal || showEditModal} onOpenChange={(open) => {
@@ -353,13 +454,19 @@ const StudentActionsManagement: React.FC = () => {
           setShowCreateModal(false);
           setShowEditModal(false);
           setEditingAction(null);
+          setErrors({});
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle>
               {editingAction ? 'Editar Acción' : 'Nueva Acción'}
             </DialogTitle>
+            <DialogDescription>
+              {editingAction 
+                ? 'Modifica los datos de la acción de estudiante.' 
+                : 'Completa el formulario para crear una nueva acción de estudiante.'}
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -368,56 +475,51 @@ const StudentActionsManagement: React.FC = () => {
               <Input
                 id="nombre"
                 value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, nombre: e.target.value });
+                  if (errors.nombre) {
+                    setErrors({ ...errors, nombre: undefined });
+                  }
+                }}
                 placeholder="Nombre de la acción"
-                required
+                className={errors.nombre ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {errors.nombre && (
+                <p className="text-xs text-red-500 mt-1">{errors.nombre}</p>
+              )}
             </div>
             
             <div>
-              <Label htmlFor="descripcion">Descripción</Label>
-              <textarea
-                id="descripcion"
-                value={formData.descripcion}
-                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                placeholder="Descripción de la acción"
-                className="w-full p-2 border border-gray-300 rounded-md"
-                rows={3}
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="division">División *</Label>
-                <Select value={formData.division} onValueChange={(value) => setFormData({ ...formData, division: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar división" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {divisions.map(division => (
-                      <SelectItem key={division._id} value={division._id}>
-                        {division.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="categoria">Categoría *</Label>
-                <Select value={formData.categoria} onValueChange={(value) => setFormData({ ...formData, categoria: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="alimentacion">Alimentación</SelectItem>
-                    <SelectItem value="higiene">Higiene</SelectItem>
-                    <SelectItem value="descanso">Descanso</SelectItem>
-                    <SelectItem value="juego">Juego</SelectItem>
-                    <SelectItem value="otro">Otro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Label htmlFor="division">División *</Label>
+              <Select 
+                value={formData.division} 
+                onValueChange={(value) => {
+                  setFormData({ ...formData, division: value });
+                  if (errors.division) {
+                    setErrors({ ...errors, division: undefined });
+                  }
+                }}
+                disabled={!!selectedDivisionForManagement} // Deshabilitar si ya está preseleccionada
+              >
+                <SelectTrigger className={errors.division ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Seleccionar división" />
+                </SelectTrigger>
+                <SelectContent>
+                  {divisions.map(division => (
+                    <SelectItem key={division._id} value={division._id}>
+                      {division.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedDivisionForManagement && (
+                <p className="text-xs text-gray-500 mt-1">
+                  La acción se creará para la división seleccionada
+                </p>
+              )}
+              {errors.division && (
+                <p className="text-xs text-red-500 mt-1">{errors.division}</p>
+              )}
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -427,16 +529,29 @@ const StudentActionsManagement: React.FC = () => {
                   <input
                     type="color"
                     value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, color: e.target.value });
+                      if (errors.color) {
+                        setErrors({ ...errors, color: undefined });
+                      }
+                    }}
                     className="w-12 h-10 border border-gray-300 rounded"
                   />
                   <Input
                     value={formData.color}
-                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, color: e.target.value });
+                      if (errors.color) {
+                        setErrors({ ...errors, color: undefined });
+                      }
+                    }}
                     placeholder="#0E5FCE"
-                    className="flex-1"
+                    className={`flex-1 ${errors.color ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
                 </div>
+                {errors.color && (
+                  <p className="text-xs text-red-500 mt-1">{errors.color}</p>
+                )}
               </div>
               
               <div>

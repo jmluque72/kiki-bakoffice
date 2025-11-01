@@ -71,7 +71,11 @@ class RefreshTokenService {
 
       console.log('🔄 [REFRESH TOKEN] Renovando access token...');
       
-      const response = await fetch('/api/auth/refresh', {
+      // Obtener la URL base del API desde la configuración
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 
+        (import.meta.env.DEV ? 'http://localhost:3000' : 'https://api.kiki.com.ar');
+      
+      const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +118,11 @@ class RefreshTokenService {
 
       console.log('🔒 [REFRESH TOKEN] Revocando refresh token...');
       
-      const response = await fetch('/api/auth/revoke', {
+      // Obtener la URL base del API desde la configuración
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 
+        (import.meta.env.DEV ? 'http://localhost:3000' : 'https://api.kiki.com.ar');
+      
+      const response = await fetch(`${apiBaseUrl}/auth/revoke`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,6 +161,30 @@ class RefreshTokenService {
     const accessToken = this.getAccessToken();
     const refreshToken = this.getRefreshToken();
     return !!(accessToken && refreshToken);
+  }
+
+  /**
+   * Verifica si el token aún no ha expirado
+   */
+  static isTokenValid(): boolean {
+    const expiresAt = localStorage.getItem(this.STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    if (!expiresAt) return false;
+    
+    const expirationTime = parseInt(expiresAt);
+    return Date.now() < expirationTime;
+  }
+
+  /**
+   * Obtiene los minutos restantes hasta la expiración
+   */
+  static getMinutesUntilExpiration(): number {
+    const expiresAt = localStorage.getItem(this.STORAGE_KEYS.TOKEN_EXPIRES_AT);
+    if (!expiresAt) return 0;
+    
+    const expirationTime = parseInt(expiresAt);
+    const now = Date.now();
+    const diffMs = expirationTime - now;
+    return Math.max(0, Math.floor(diffMs / 60000)); // Convertir a minutos
   }
 }
 

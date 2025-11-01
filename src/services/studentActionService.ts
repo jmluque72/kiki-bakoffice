@@ -155,6 +155,74 @@ export const studentActionService = {
       console.error('Error obteniendo acciones del estudiante:', error);
       throw error;
     }
+  },
+
+  // Obtener acciones por división (para coordinadores)
+  async getDivisionActions(divisionId: string, fecha?: string, fechaInicio?: string, fechaFin?: string): Promise<StudentActionLog[]> {
+    try {
+      const params: any = {};
+      if (fecha) params.fecha = fecha;
+      if (fechaInicio) params.fechaInicio = fechaInicio;
+      if (fechaFin) params.fechaFin = fechaFin;
+      
+      console.log('🔍 [STUDENT ACTION SERVICE] Obteniendo acciones por división:', {
+        divisionId,
+        fecha,
+        fechaInicio,
+        fechaFin,
+        params
+      });
+      
+      const response = await apiClient.get(`/api/student-actions/log/division/${divisionId}`, { params });
+      
+      console.log('✅ [STUDENT ACTION SERVICE] Respuesta recibida:', {
+        success: response.data.success,
+        dataLength: response.data.data?.length || 0,
+        data: response.data.data
+      });
+      
+      return response.data.data || [];
+    } catch (error: any) {
+      console.error('❌ [STUDENT ACTION SERVICE] Error obteniendo acciones por división:', error);
+      console.error('❌ [STUDENT ACTION SERVICE] Error response:', error.response?.data);
+      console.error('❌ [STUDENT ACTION SERVICE] Error status:', error.response?.status);
+      throw error;
+    }
+  },
+
+  // Obtener datos del calendario para un mes (acciones agrupadas por fecha)
+  async getCalendarData(divisionId: string, fechaInicio: string, fechaFin: string): Promise<{ [fecha: string]: number }> {
+    try {
+      console.log('📅 [STUDENT ACTION SERVICE] Obteniendo datos del calendario:', {
+        divisionId,
+        fechaInicio,
+        fechaFin
+      });
+      
+      const actions = await this.getDivisionActions(divisionId, undefined, fechaInicio, fechaFin);
+      
+      console.log('📊 [STUDENT ACTION SERVICE] Acciones obtenidas para calendario:', actions.length);
+      
+      // Agrupar por fecha (normalizando a fecha local)
+      const calendarData: { [fecha: string]: number } = {};
+      actions.forEach(action => {
+        // Convertir a fecha local para evitar problemas de timezone
+        const actionDate = new Date(action.fechaAccion);
+        const year = actionDate.getFullYear();
+        const month = String(actionDate.getMonth() + 1).padStart(2, '0');
+        const day = String(actionDate.getDate()).padStart(2, '0');
+        const fecha = `${year}-${month}-${day}`;
+        calendarData[fecha] = (calendarData[fecha] || 0) + 1;
+      });
+      
+      console.log('📊 [STUDENT ACTION SERVICE] Datos del calendario agrupados:', Object.keys(calendarData).length, 'días con acciones');
+      console.log('📊 [STUDENT ACTION SERVICE] Desglose:', calendarData);
+      
+      return calendarData;
+    } catch (error) {
+      console.error('❌ [STUDENT ACTION SERVICE] Error obteniendo datos del calendario:', error);
+      throw error;
+    }
   }
 };
 
