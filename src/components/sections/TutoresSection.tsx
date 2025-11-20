@@ -56,9 +56,10 @@ interface Tutor {
 
 interface TutoresSectionProps {
   userRole: string;
+  isReadonly?: boolean;
 }
 
-const TutoresSection = ({ userRole }: TutoresSectionProps) => {
+const TutoresSection = ({ userRole, isReadonly = false }: TutoresSectionProps) => {
   const [tutores, setTutores] = useState<Tutor[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');

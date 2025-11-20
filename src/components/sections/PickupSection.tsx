@@ -76,7 +76,11 @@ interface Student {
   apellido: string;
 }
 
-const PickupSection: React.FC = () => {
+interface PickupSectionProps {
+  isReadonly?: boolean;
+}
+
+const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const { apiClient } = useApi();
   

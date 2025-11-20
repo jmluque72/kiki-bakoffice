@@ -6,9 +6,13 @@ import {
   MapPin,
   Clock,
   Users,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Loader2
 } from 'lucide-react';
 import { EventService, Event } from '../services/eventService';
+import { apiClient } from '../config/api';
+import * as XLSX from 'xlsx';
 
 
 interface EventsCalendarProps {
@@ -34,6 +38,7 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const monthNames = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -183,6 +188,184 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
     }
   };
 
+  // Exportar eventos del mes a Excel
+  const handleExportToExcel = async () => {
+    if (!selectedDivision) {
+      alert('Por favor, selecciona una división primero');
+      return;
+    }
+
+    try {
+      setExporting(true);
+      
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+
+      const params = new URLSearchParams({
+        divisionId: selectedDivision,
+        fechaInicio: startDate.toISOString().split('T')[0],
+        fechaFin: endDate.toISOString().split('T')[0]
+      });
+
+      console.log('📊 [EXPORT] Obteniendo eventos para exportar...', params.toString());
+      
+      const response = await apiClient.get(`/api/events/export/month?${params.toString()}`);
+      const { events, totalEvents, totalStudents } = response.data.data;
+
+      console.log('📊 [EXPORT] Eventos recibidos:', totalEvents);
+
+      // Preparar datos para Excel
+      const excelData: any[] = [];
+
+      events.forEach((event: any) => {
+        if (event.requiereAutorizacion && (event.authorizations.length > 0 || event.studentsPending.length > 0)) {
+          // Evento con autorizaciones
+          // Agregar fila principal del evento
+          excelData.push({
+            'Evento': event.titulo,
+            'Fecha': new Date(event.fecha).toLocaleDateString('es-AR'),
+            'Hora': event.hora,
+            'Lugar': event.lugar || '',
+            'Descripción': event.descripcion,
+            'Requiere Autorización': 'Sí',
+            'Estudiante': '',
+            'Tutor': '',
+            'Email Tutor': '',
+            'Estado Autorización': '',
+            'Fecha Autorización': '',
+            'Comentarios': ''
+          });
+
+          // Agregar autorizaciones aprobadas
+          const autorizados = event.authorizations.filter((auth: any) => auth.autorizado);
+          autorizados.forEach((auth: any) => {
+            excelData.push({
+              'Evento': '',
+              'Fecha': '',
+              'Hora': '',
+              'Lugar': '',
+              'Descripción': '',
+              'Requiere Autorización': '',
+              'Estudiante': auth.estudiante,
+              'Tutor': auth.tutor,
+              'Email Tutor': auth.emailTutor,
+              'Estado Autorización': 'Aprobado',
+              'Fecha Autorización': auth.fechaAutorizacion ? new Date(auth.fechaAutorizacion).toLocaleDateString('es-AR') : '',
+              'Comentarios': auth.comentarios
+            });
+          });
+
+          // Agregar autorizaciones rechazadas
+          const rechazados = event.authorizations.filter((auth: any) => !auth.autorizado);
+          rechazados.forEach((auth: any) => {
+            excelData.push({
+              'Evento': '',
+              'Fecha': '',
+              'Hora': '',
+              'Lugar': '',
+              'Descripción': '',
+              'Requiere Autorización': '',
+              'Estudiante': auth.estudiante,
+              'Tutor': auth.tutor,
+              'Email Tutor': auth.emailTutor,
+              'Estado Autorización': 'Rechazado',
+              'Fecha Autorización': auth.fechaAutorizacion ? new Date(auth.fechaAutorizacion).toLocaleDateString('es-AR') : '',
+              'Comentarios': auth.comentarios
+            });
+          });
+
+          // Agregar pendientes
+          event.studentsPending.forEach((student: any) => {
+            excelData.push({
+              'Evento': '',
+              'Fecha': '',
+              'Hora': '',
+              'Lugar': '',
+              'Descripción': '',
+              'Requiere Autorización': '',
+              'Estudiante': student.estudiante,
+              'Tutor': '',
+              'Email Tutor': '',
+              'Estado Autorización': 'Pendiente',
+              'Fecha Autorización': '',
+              'Comentarios': ''
+            });
+          });
+
+          // Agregar fila vacía entre eventos
+          excelData.push({
+            'Evento': '',
+            'Fecha': '',
+            'Hora': '',
+            'Lugar': '',
+            'Descripción': '',
+            'Requiere Autorización': '',
+            'Estudiante': '',
+            'Tutor': '',
+            'Email Tutor': '',
+            'Estado Autorización': '',
+            'Fecha Autorización': '',
+            'Comentarios': ''
+          });
+        } else {
+          // Evento sin autorización o sin autorizaciones registradas
+          excelData.push({
+            'Evento': event.titulo,
+            'Fecha': new Date(event.fecha).toLocaleDateString('es-AR'),
+            'Hora': event.hora,
+            'Lugar': event.lugar || '',
+            'Descripción': event.descripcion,
+            'Requiere Autorización': event.requiereAutorizacion ? 'Sí' : 'No',
+            'Estudiante': '',
+            'Tutor': '',
+            'Email Tutor': '',
+            'Estado Autorización': '',
+            'Fecha Autorización': '',
+            'Comentarios': ''
+          });
+        }
+      });
+
+      // Crear workbook y worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Eventos');
+
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 30 }, // Evento
+        { wch: 12 }, // Fecha
+        { wch: 10 }, // Hora
+        { wch: 25 }, // Lugar
+        { wch: 40 }, // Descripción
+        { wch: 20 }, // Requiere Autorización
+        { wch: 30 }, // Estudiante
+        { wch: 25 }, // Tutor
+        { wch: 30 }, // Email Tutor
+        { wch: 20 }, // Estado Autorización
+        { wch: 18 }, // Fecha Autorización
+        { wch: 40 }  // Comentarios
+      ];
+      ws['!cols'] = colWidths;
+
+      // Generar nombre de archivo con fecha
+      const monthName = monthNames[currentDate.getMonth()];
+      const fileName = `eventos_${monthName}_${year}_${selectedDivision}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(wb, fileName);
+      console.log('✅ [EXPORT] Archivo exportado exitosamente:', fileName);
+
+    } catch (error: any) {
+      console.error('❌ [EXPORT] Error al exportar eventos:', error);
+      alert('Error al exportar eventos: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -202,6 +385,24 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
           </h3>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            onClick={handleExportToExcel}
+            disabled={exporting || !selectedDivision}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Exportar eventos del mes a Excel"
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Exportando...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Exportar a Excel</span>
+              </>
+            )}
+          </button>
           <button
             onClick={goToPreviousMonth}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -260,8 +461,8 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
                   {day.events.slice(0, 2).map((event, eventIndex) => (
                     <div
                       key={eventIndex}
-                      className={`w-2 h-2 rounded-full ${getEventColor(event.categoria)}`}
-                      title={event.nombre}
+                      className={`w-2 h-2 rounded-full ${getEventColor(event.categoria || '')}`}
+                      title={event.titulo}
                     />
                   ))}
                   {day.events.length > 2 && (
@@ -278,11 +479,11 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
                   key={event._id}
                   className={`
                     text-xs p-1 rounded truncate
-                    ${getEventColor(event.categoria)} text-white
+                    ${getEventColor(event.categoria || '')} text-white
                   `}
-                  title={event.nombre}
+                  title={event.titulo}
                 >
-                  {event.nombre}
+                  {event.titulo}
                 </div>
               ))}
               {day.events.length > 2 && (

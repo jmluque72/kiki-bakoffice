@@ -19,59 +19,67 @@ import { StudentActionsSection } from './sections/StudentActionsSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState('dashboard');
   const { user } = useAuth();
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  // Superadmin inicia en accounts, otros usuarios en dashboard
+  const [activeSection, setActiveSection] = useState(isSuperAdmin ? 'accounts' : 'dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const renderContent = () => {
+    const userRole = user?.role?.nombre || '';
+    const isSuperAdmin = userRole === 'superadmin';
+    
     // Si el usuario no es superadmin y trata de acceder a accounts, redirigir a divisiones
-    if (activeSection === 'accounts' && user?.role?.nombre !== 'superadmin') {
+    if (activeSection === 'accounts' && !isSuperAdmin) {
       setActiveSection('divisiones');
-      return <GruposSection userRole={user?.role?.nombre || ''} />;
+      return <GruposSection userRole={userRole} />;
     }
 
-    // Si el usuario no es adminaccount y trata de acceder a documentos, redirigir a divisiones
-    if (activeSection === 'documentos' && user?.role?.nombre !== 'adminaccount') {
+    // Si el usuario no es adminaccount ni superadmin y trata de acceder a documentos, redirigir a divisiones
+    if (activeSection === 'documentos' && userRole !== 'adminaccount' && !isSuperAdmin) {
       setActiveSection('divisiones');
-      return <GruposSection userRole={user?.role?.nombre || ''} />;
+      return <GruposSection userRole={userRole} />;
     }
 
     // Si el usuario es adminaccount y trata de acceder al dashboard, redirigir a divisiones
-    if (activeSection === 'dashboard' && user?.role?.nombre === 'adminaccount') {
+    if (activeSection === 'dashboard' && userRole === 'adminaccount') {
       setActiveSection('divisiones');
-      return <GruposSection userRole={user?.role?.nombre || ''} />;
+      return <GruposSection userRole={userRole} />;
     }
 
+    // Pasar isReadonly a todas las secciones cuando es superadmin
+    // Superadmin tiene permisos completos (isReadonly=false), otros roles pueden tener restricciones
     switch (activeSection) {
       case 'accounts':
-        return <AccountsSection />;
+        return <AccountsSection isReadonly={false} />; // Superadmin puede crear y editar instituciones
       case 'usuarios':
-        return <UsuariosSection />;
+        return <UsuariosSection isReadonly={isSuperAdmin} />;
       case 'activity':
-        return <ActivitySection />;
-                      case 'eventos':
-        return <EventosSection />;
+        return <ActivitySection isReadonly={isSuperAdmin} />;
+      case 'eventos':
+        return <EventosSection isReadonly={isSuperAdmin} />;
       case 'notificaciones':
-        return <NotificationsSection />;
+        return <NotificationsSection isReadonly={isSuperAdmin} />;
       case 'divisiones':
         return <GruposSection 
           userRole={user?.role?.nombre || ''} 
           onSectionChange={setActiveSection}
+          isReadonly={isSuperAdmin}
         />;
       case 'coordinadores':
-        return <CoordinadoresSection userRole={user?.role?.nombre || ''} />;
+        return <CoordinadoresSection userRole={user?.role?.nombre || ''} isReadonly={isSuperAdmin} />;
       case 'tutores':
-        return <TutoresSection userRole={user?.role?.nombre || ''} />;
+        return <TutoresSection userRole={user?.role?.nombre || ''} isReadonly={isSuperAdmin} />;
       case 'asistencias':
-        return <AsistenciasSection />;
+        return <AsistenciasSection isReadonly={isSuperAdmin} />;
       case 'acciones-diarias':
-        return <StudentActionsSection />;
+        return <StudentActionsSection isReadonly={isSuperAdmin} />;
       case 'alumnos':
-        return <StudentsSection />;
+        return <StudentsSection isReadonly={isSuperAdmin} />;
       case 'pickup':
-        return <PickupSection />;
+        return <PickupSection isReadonly={isSuperAdmin} />;
       case 'documentos':
-        return <DocumentsSection />;
+        return <DocumentsSection isReadonly={isSuperAdmin} />;
       case 'dashboard':
       default:
         return <DashboardContent />;

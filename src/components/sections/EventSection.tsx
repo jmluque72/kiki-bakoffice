@@ -421,6 +421,7 @@ export const EventSection: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onEventCreated={handleEventCreated}
+        selectedDivision={selectedDivision}
       />
 
       {/* Modal de Confirmación de Eliminación */}

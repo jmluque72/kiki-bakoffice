@@ -25,7 +25,11 @@ import { AttendanceCalendar } from '../AttendanceCalendar';
 import { AttendanceDayModal } from '../AttendanceDayModal';
 import { Asistencia } from '../../services/asistenciaService';
 
-export const AsistenciasSection: React.FC = () => {
+interface AsistenciasSectionProps {
+  isReadonly?: boolean;
+}
+
+export const AsistenciasSection: React.FC<AsistenciasSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
 

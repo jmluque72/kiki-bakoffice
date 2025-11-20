@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, Users, CheckSquare, AlertCircle, Loader2 } from 'lucide-react';
-import { useDivisions } from '../hooks/useDivisions';
 import { useEvents } from '../hooks/useEvents';
 import { useAuth } from '../hooks/useAuth';
 
@@ -8,11 +7,11 @@ interface CreateEventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onEventCreated: () => void;
+  selectedDivision?: string; // División seleccionada desde el calendario
 }
 
-export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, onEventCreated }) => {
+export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onClose, onEventCreated, selectedDivision }) => {
   const { user } = useAuth();
-  const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
   const { createEvent, loading: createLoading, error: createError, clearError } = useEvents();
 
   const [titulo, setTitulo] = useState('');
@@ -20,7 +19,6 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('09:00');
   const [lugar, setLugar] = useState('');
-  const [selectedDivision, setSelectedDivision] = useState('');
   const [requiereAutorizacion, setRequiereAutorizacion] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -32,7 +30,6 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
       setFecha(new Date().toISOString().split('T')[0]); // Default to today
       setHora('09:00');
       setLugar('');
-      setSelectedDivision('');
       setRequiereAutorizacion(false);
       setFormError(null);
       clearError();
@@ -69,9 +66,15 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
       userAccount: user?.account?._id
     });
 
-    if (!titulo || !descripcion || !fecha || !hora || !selectedDivision) {
+    if (!titulo || !descripcion || !fecha || !hora) {
       console.log('❌ [CREATE_EVENT] Campos obligatorios faltantes');
-      setFormError('Por favor, completa todos los campos obligatorios (Título, Descripción, Fecha, Hora, División).');
+      setFormError('Por favor, completa todos los campos obligatorios (Título, Descripción, Fecha, Hora).');
+      return;
+    }
+
+    if (!selectedDivision) {
+      console.log('❌ [CREATE_EVENT] No hay división seleccionada');
+      setFormError('Por favor, selecciona una división en el calendario antes de crear un evento.');
       return;
     }
 
@@ -135,6 +138,16 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1">
+          {!selectedDivision && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 px-4 py-3 rounded-lg mb-4">
+              <div className="flex items-center">
+                <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
+                <p className="text-sm text-yellow-700">
+                  Por favor, selecciona una división en el calendario antes de crear un evento.
+                </p>
+              </div>
+            </div>
+          )}
           {formError && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
               <div className="flex items-center">
@@ -232,36 +245,6 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({ isOpen, onCl
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Ubicación del evento (opcional)"
               />
-            </div>
-
-            {/* División */}
-            <div>
-              <label htmlFor="division" className="block text-sm font-medium text-gray-700 mb-2">
-                División *
-              </label>
-              {divisionsLoading ? (
-                <div className="flex items-center space-x-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                  <span className="text-gray-600">Cargando divisiones...</span>
-                </div>
-              ) : divisionsError ? (
-                <div className="text-red-600 text-sm">{divisionsError}</div>
-              ) : (
-                <select
-                  id="division"
-                  value={selectedDivision}
-                  onChange={(e) => setSelectedDivision(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                >
-                  <option value="">Selecciona una división</option>
-                  {divisions.map((division) => (
-                    <option key={division._id} value={division._id}>
-                      {division.nombre}
-                    </option>
-                  ))}
-                </select>
-              )}
             </div>
 
             {/* Requiere Autorización */}

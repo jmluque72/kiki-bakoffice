@@ -14,7 +14,11 @@ import { ActivitiesCalendar } from '../ActivitiesCalendar';
 import { ActivityDayModal } from '../ActivityDayModal';
 import { useActivities } from '../../hooks/useActivities';
 
-export const ActivitySection: React.FC = () => {
+interface ActivitySectionProps {
+  isReadonly?: boolean;
+}
+
+export const ActivitySection: React.FC<ActivitySectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
   const { changeActivityStatus, deleteActivity } = useActivities();

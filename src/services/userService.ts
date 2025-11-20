@@ -30,6 +30,15 @@ export interface UsersResponse {
     total: number;
     page: number;
     limit: number;
+    stats?: {
+      total: number;
+      active: number;
+      inactive: number;
+      coordinadores: number;
+      familiares: number;
+      tutores: number;
+      familyadmin: number;
+    };
   };
 }
 
@@ -59,7 +68,11 @@ class UserService {
       if (limit) params.append('limit', limit.toString());
       if (search) params.append('search', search);
 
-      const response = await apiClient.get(`/api/users?${params.toString()}`);
+      const url = `/api/users?${params.toString()}`;
+      console.log('🌐 [SERVICE] Llamando a:', url);
+      console.log('🌐 [SERVICE] URL completa será:', apiClient.defaults.baseURL + url);
+      const response = await apiClient.get(url);
+      console.log('✅ [SERVICE] Respuesta recibida:', response);
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -103,6 +116,18 @@ class UserService {
       return response.data.data;
     } catch (error) {
       console.error('Error fetching user:', error);
+      throw error;
+    }
+  }
+
+  // Obtener todos los usuarios para exportar (sin paginación)
+  async getAllUsersForExport(): Promise<User[]> {
+    try {
+      // Obtener todos los usuarios con un límite muy alto
+      const response = await apiClient.get(`/api/users?page=1&limit=10000`);
+      return response.data.data.users;
+    } catch (error) {
+      console.error('Error fetching all users for export:', error);
       throw error;
     }
   }

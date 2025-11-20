@@ -15,7 +15,11 @@ import { Document } from '../../services/documentService';
 import documentService from '../../services/documentService';
 import { useAuth } from '../../hooks/useAuth';
 
-export const DocumentsSection: React.FC = () => {
+interface DocumentsSectionProps {
+  isReadonly?: boolean;
+}
+
+export const DocumentsSection: React.FC<DocumentsSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   

@@ -6,7 +6,11 @@ import { StudentActionsDayModal } from '../StudentActionsDayModal';
 import { useDivisions } from '../../hooks/useDivisions';
 import { StudentActionLog } from '../../services/studentActionService';
 
-const StudentActionsSection: React.FC = () => {
+interface StudentActionsSectionProps {
+  isReadonly?: boolean;
+}
+
+const StudentActionsSection: React.FC<StudentActionsSectionProps> = ({ isReadonly = false }) => {
   const { divisions, loading: divisionsLoading } = useDivisions();
   const [activeTab, setActiveTab] = useState<'management' | 'calendar'>('management');
   const [selectedDivision, setSelectedDivision] = useState<string>('');

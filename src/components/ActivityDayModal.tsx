@@ -399,12 +399,16 @@ export const ActivityDayModal: React.FC<ActivityDayModalProps> = ({
                           <div key={index} className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                               <span className="text-xs font-medium text-blue-600">
-                                {participant.nombre?.charAt(0) || '?'}
+                                {participant.nombre?.charAt(0) || participant.apellido?.charAt(0) || '?'}
                               </span>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-gray-900">{participant.nombre}</p>
-                              <p className="text-xs text-gray-600">{participant.email}</p>
+                              <p className="text-sm font-medium text-gray-900">
+                                {participant.nombre} {participant.apellido}
+                              </p>
+                              {participant.email && (
+                                <p className="text-xs text-gray-600">{participant.email}</p>
+                              )}
                             </div>
                           </div>
                         ))}

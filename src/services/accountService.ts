@@ -136,4 +136,55 @@ export class AccountService {
       throw new Error(error.response?.data?.message || 'Error al crear usuario administrador');
     }
   }
+
+  // Configuración de cuenta
+  static async getAccountConfig(accountId: string): Promise<{
+    _id: string;
+    account: string;
+    requiereAprobarActividades: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    try {
+      const response = await apiClient.get<ApiResponse<{
+        config: {
+          _id: string;
+          account: string;
+          requiereAprobarActividades: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+      }>>(`/api/accounts/${accountId}/config`);
+      
+      return response.data.data!.config;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener configuración');
+    }
+  }
+
+  static async updateAccountConfig(accountId: string, config: {
+    requiereAprobarActividades: boolean;
+  }): Promise<{
+    _id: string;
+    account: string;
+    requiereAprobarActividades: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    try {
+      const response = await apiClient.put<ApiResponse<{
+        config: {
+          _id: string;
+          account: string;
+          requiereAprobarActividades: boolean;
+          createdAt: string;
+          updatedAt: string;
+        };
+      }>>(`/api/accounts/${accountId}/config`, config);
+      
+      return response.data.data!.config;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al actualizar configuración');
+    }
+  }
 } 

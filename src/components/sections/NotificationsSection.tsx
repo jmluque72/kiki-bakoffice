@@ -8,10 +8,14 @@ import { SendNotificationModal } from '../SendNotificationModal';
 import { NotificationsCalendar } from '../NotificationsCalendar';
 import { NotificationDayModal } from '../NotificationDayModal';
 
-export const NotificationsSection: React.FC = () => {
+interface NotificationsSectionProps {
+  isReadonly?: boolean;
+}
+
+export const NotificationsSection: React.FC<NotificationsSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role?.nombre === 'superadmin';
-  const canSendNotifications = !isSuperAdmin; // Solo superadmin no puede enviar
+  const canSendNotifications = !isSuperAdmin && !isReadonly; // Solo superadmin no puede enviar, o si está en modo readonly
   
   // Estados para vista de calendario
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');

@@ -50,11 +50,17 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+        {/* Logo Kiki arriba */}
+        <div className="flex justify-center mb-8">
+          <img 
+            src="/kiki_splash.png" 
+            alt="Kiki Logo" 
+            className="h-40 w-auto"
+          />
+        </div>
+        
         <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-            <Lock className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Backoffice</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Bienvenido a KIKI</h1>
           <p className="text-gray-600">Inicia sesión para continuar</p>
         </div>
 

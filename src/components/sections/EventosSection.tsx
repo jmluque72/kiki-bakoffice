@@ -15,7 +15,11 @@ import { EventsCalendar } from '../EventsCalendar';
 import { EventDayModal } from '../EventDayModal';
 import { CreateEventModal } from '../CreateEventModal';
 
-export const EventosSection: React.FC = () => {
+interface EventosSectionProps {
+  isReadonly?: boolean;
+}
+
+export const EventosSection: React.FC<EventosSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const { divisions, loading: divisionsLoading, error: divisionsError } = useDivisions();
 
@@ -201,6 +205,7 @@ export const EventosSection: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onEventCreated={handleEventCreated}
+        selectedDivision={selectedDivision}
       />
 
       {/* Notificación */}

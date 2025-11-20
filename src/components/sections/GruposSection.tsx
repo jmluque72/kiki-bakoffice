@@ -37,9 +37,10 @@ import { ConfirmationDialog } from '../ConfirmationDialog';
 interface GruposSectionProps {
   userRole: string;
   onSectionChange?: (section: string) => void;
+  isReadonly?: boolean;
 }
 
-const GruposSection = ({ userRole, onSectionChange }: GruposSectionProps) => {
+const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: GruposSectionProps) => {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [openDialog, setOpenDialog] = useState(false);

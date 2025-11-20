@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Plus, MoreVertical, Users, UserCheck, UserX, X, Mail, User as UserIcon, Loader2, AlertCircle } from 'lucide-react';
+import { Search, Filter, Plus, MoreVertical, Users, UserCheck, UserX, X, Mail, User as UserIcon, Loader2, AlertCircle, UserCog, UsersRound, Download } from 'lucide-react';
 import { userService, User, UserFormData } from '../../services/userService';
 import { getRoleDisplayName } from '../../utils/roleTranslations';
 import { useAuth } from '../../hooks/useAuth';
+import * as XLSX from 'xlsx';
 
-export const UsuariosSection: React.FC = () => {
+interface UsuariosSectionProps {
+  isReadonly?: boolean;
+}
+
+export const UsuariosSection: React.FC<UsuariosSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role?.nombre === 'superadmin';
   
@@ -17,6 +22,15 @@ export const UsuariosSection: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    coordinadores: 0,
+    familiares: 0,
+    tutores: 0,
+    familyadmin: 0
+  });
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
@@ -49,8 +63,7 @@ export const UsuariosSection: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const activeUsers = users.filter(user => user.activo).length;
-  const inactiveUsers = users.filter(user => !user.activo).length;
+  // Las estadísticas ahora vienen del servidor
 
   const openModal = () => {
     // Modal desactivado - Los usuarios se crean por Excel o app móvil
@@ -92,12 +105,30 @@ export const UsuariosSection: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
+      console.log('📞 [FRONTEND] fetchUsers llamado');
+      console.log('📞 [FRONTEND] Parámetros:', { currentPage, limit: 10, searchTerm });
       setLoading(true);
       setError(null);
+      console.log('📞 [FRONTEND] Llamando a userService.getUsers...');
       const response = await userService.getUsers(currentPage, 10, searchTerm);
+      console.log('✅ [FRONTEND] Respuesta recibida de userService.getUsers');
+      console.log('📊 [FRONTEND] Respuesta completa del servicio:', response);
+      console.log('📊 [FRONTEND] response.data:', response.data);
+      console.log('📊 [FRONTEND] response.data.stats:', response.data?.stats);
       setUsers(response.data.users);
       setTotalUsers(response.data.total);
       setTotalPages(Math.ceil(response.data.total / 10));
+      // Usar estadísticas del servidor si están disponibles
+      if (response.data?.stats) {
+        console.log('📊 [FRONTEND] Estableciendo stats:', response.data.stats);
+        setStats(response.data.stats);
+      } else {
+        console.warn('⚠️ [FRONTEND] No se recibieron stats del servidor. response.data:', response.data);
+        // Si no hay stats, al menos usar el total
+        if (response.data?.total) {
+          setStats(prev => ({ ...prev, total: response.data.total }));
+        }
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Error al cargar usuarios');
@@ -107,6 +138,8 @@ export const UsuariosSection: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log('🔄 [FRONTEND] useEffect ejecutado, llamando fetchUsers...');
+    console.log('🔄 [FRONTEND] currentPage:', currentPage, 'searchTerm:', searchTerm);
     fetchUsers();
   }, [currentPage, searchTerm]);
 
@@ -115,15 +148,69 @@ export const UsuariosSection: React.FC = () => {
     setCurrentPage(1);
   }, [searchTerm]);
 
+  // Exportar usuarios a Excel
+  const exportToExcel = async () => {
+    try {
+      setLoading(true);
+      console.log('📥 [EXPORT] Iniciando exportación de usuarios...');
+      
+      // Obtener todos los usuarios
+      const allUsers = await userService.getAllUsersForExport();
+      console.log('📥 [EXPORT] Usuarios obtenidos:', allUsers.length);
+      
+      // Preparar datos para Excel
+      const excelData = allUsers.map(user => ({
+        'Nombre': user.nombre || user.name || '',
+        'Email': user.email || '',
+        'Rol': getRoleDisplayName(user.role?.nombre || ''),
+        'Estado': user.activo ? 'Activo' : 'Inactivo',
+        'Fecha Creación': new Date(user.createdAt).toLocaleDateString('es-AR'),
+        'Última Actualización': new Date(user.updatedAt).toLocaleDateString('es-AR')
+      }));
+      
+      // Crear workbook y worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Usuarios');
+      
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 30 }, // Nombre
+        { wch: 35 }, // Email
+        { wch: 25 }, // Rol
+        { wch: 15 }, // Estado
+        { wch: 18 }, // Fecha Creación
+        { wch: 18 }  // Última Actualización
+      ];
+      ws['!cols'] = colWidths;
+      
+      // Generar nombre de archivo con fecha
+      const fileName = `usuarios_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      // Descargar archivo
+      XLSX.writeFile(wb, fileName);
+      console.log('✅ [EXPORT] Archivo exportado exitosamente:', fileName);
+      
+    } catch (error) {
+      console.error('❌ [EXPORT] Error al exportar usuarios:', error);
+      setError('Error al exportar usuarios a Excel');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  console.log('🎨 [FRONTEND] UsuariosSection renderizado');
+  console.log('🎨 [FRONTEND] Estado actual - users:', users.length, 'stats:', stats);
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Usuarios</p>
-              <p className="text-2xl font-bold text-gray-900">{totalUsers}</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.total || totalUsers}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <Users className="w-6 h-6 text-blue-600" />
@@ -134,11 +221,12 @@ export const UsuariosSection: React.FC = () => {
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Usuarios Activos</p>
-              <p className="text-2xl font-bold text-gray-900">{activeUsers}</p>
+              <p className="text-sm text-gray-600">Tutores</p>
+              <p className="text-xs text-gray-500 mb-1">(familyadmin)</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.tutores}</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <UserCheck className="w-6 h-6 text-green-600" />
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <UsersRound className="w-6 h-6 text-orange-600" />
             </div>
           </div>
         </div>
@@ -146,11 +234,25 @@ export const UsuariosSection: React.FC = () => {
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Usuarios Inactivos</p>
-              <p className="text-2xl font-bold text-gray-900">{inactiveUsers}</p>
+              <p className="text-sm text-gray-600">Familiares</p>
+              <p className="text-xs text-gray-500 mb-1">(familyviewer)</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.familiares}</p>
             </div>
-            <div className="p-3 bg-red-100 rounded-lg">
-              <UserX className="w-6 h-6 text-red-600" />
+            <div className="p-3 bg-cyan-100 rounded-lg">
+              <UsersRound className="w-6 h-6 text-cyan-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Coordinadores</p>
+              <p className="text-xs text-gray-500 mb-1">(coordinador)</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.coordinadores}</p>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <UserCog className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
@@ -166,25 +268,6 @@ export const UsuariosSection: React.FC = () => {
         </div>
       )}
 
-      {/* Info Message */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-        <div className="flex items-center">
-          <div className="p-2 bg-blue-100 rounded-lg mr-3">
-            <Users className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h3 className="text-sm font-medium text-blue-800">Creación de Usuarios</h3>
-            <p className="text-sm text-blue-700 mt-1">
-              Los usuarios se crean automáticamente mediante:
-            </p>
-            <ul className="text-sm text-blue-700 mt-2 ml-4 list-disc">
-              <li>Carga de archivos Excel (estudiantes, coordinadores)</li>
-              <li>Registro desde la aplicación móvil</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="p-6 border-b border-gray-200">
@@ -195,14 +278,13 @@ export const UsuariosSection: React.FC = () => {
                 Los usuarios se crean automáticamente mediante carga de Excel o desde la app móvil
               </p>
             </div>
-            {/* Botón desactivado - Los usuarios se crean por Excel o app móvil */}
-            <button 
-              disabled
-              className="bg-gray-300 text-gray-500 px-4 py-2 rounded-lg cursor-not-allowed flex items-center gap-2"
-              title="Los usuarios se crean mediante carga de Excel o desde la app móvil"
+            <button
+              onClick={exportToExcel}
+              disabled={loading}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Plus className="w-4 h-4" />
-              Nuevo Usuario
+              <Download className="w-4 h-4" />
+              Exportar a Excel
             </button>
           </div>
 
@@ -259,9 +341,6 @@ export const UsuariosSection: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Último Login
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -292,11 +371,6 @@ export const UsuariosSection: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(user.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
                   </td>
                 </tr>
               ))}

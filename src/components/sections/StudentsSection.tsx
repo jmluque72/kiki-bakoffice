@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { getRoleDisplayName } from '../../utils/roleTranslations';
 import QRCode from 'qrcode';
 import { useReactToPrint } from 'react-to-print';
+import { useAuth } from '../../hooks/useAuth';
 import '../../styles/print.css';
 
 interface Student {
@@ -36,12 +37,17 @@ interface Student {
 interface StudentsSectionProps {
   selectedAccount?: any;
   selectedDivision?: any;
+  isReadonly?: boolean;
 }
 
 export const StudentsSection: React.FC<StudentsSectionProps> = ({ 
   selectedAccount, 
-  selectedDivision 
+  selectedDivision,
+  isReadonly = false
 }) => {
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  
   // Obtener la división seleccionada desde localStorage si no viene como prop
   const [currentAccount, setCurrentAccount] = useState(selectedAccount);
   const [currentDivision, setCurrentDivision] = useState(selectedDivision);
@@ -241,6 +247,12 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
 
   // Subir archivo Excel
   const handleFileUpload = async () => {
+    // Superadmin no puede cargar alumnos
+    if (isSuperAdmin) {
+      Notification.error('Los superadministradores solo pueden crear instituciones. La carga de alumnos debe realizarse desde la institución.');
+      return;
+    }
+    
     if (!uploadFile || !currentAccount?._id || !currentDivision?._id) {
       Notification.error('Por favor selecciona un archivo Excel');
       return;
@@ -369,16 +381,25 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
   };
 
   // Filtrar alumnos
-  const filteredStudents = students.filter(student =>
-    student.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.dni.includes(searchTerm) ||
-    (student.tutor && (
-      student.tutor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.tutor.email.toLowerCase().includes(searchTerm.toLowerCase())
-    ))
-  );
+  const filteredStudents = students.filter(student => {
+    const search = searchTerm?.toLowerCase() || '';
+    const nombre = student.nombre?.toLowerCase() || '';
+    const apellido = student.apellido?.toLowerCase() || '';
+    const email = student.email?.toLowerCase() || '';
+    const dni = student.dni || '';
+    
+    const matchesStudent = nombre.includes(search) ||
+                          apellido.includes(search) ||
+                          email.includes(search) ||
+                          dni.includes(searchTerm || '');
+    
+    const matchesTutor = student.tutor && (
+      (student.tutor.name?.toLowerCase() || '').includes(search) ||
+      (student.tutor.email?.toLowerCase() || '').includes(search)
+    );
+    
+    return matchesStudent || matchesTutor;
+  });
 
   useEffect(() => {
     loadStudents();
@@ -428,8 +449,20 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
           </button>
           
           <button
-            onClick={() => setShowUploadModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            onClick={() => {
+              if (isSuperAdmin) {
+                Notification.error('Los superadministradores solo pueden crear instituciones. La carga de alumnos debe realizarse desde la institución.');
+                return;
+              }
+              setShowUploadModal(true);
+            }}
+            disabled={isSuperAdmin}
+            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+              isSuperAdmin 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+            title={isSuperAdmin ? 'Los superadministradores solo pueden crear instituciones' : ''}
           >
             <Upload className="h-4 w-4 mr-2" />
             Cargar Excel

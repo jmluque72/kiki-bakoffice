@@ -40,6 +40,7 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedDivision, setSelectedDivision] = useState<string>('');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   // Tipo fijo para notificaciones desde el backoffice
   const messageType = 'institucion';
@@ -115,8 +116,23 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
   };
 
   const handleSendNotification = async () => {
+    if (!title.trim()) {
+      alert('Por favor ingresa un título');
+      return;
+    }
+    
+    if (title.length > 100) {
+      alert('El título no puede exceder 100 caracteres');
+      return;
+    }
+    
     if (!message.trim()) {
       alert('Por favor ingresa un mensaje');
+      return;
+    }
+    
+    if (message.length > 256) {
+      alert('El mensaje no puede exceder 256 caracteres');
       return;
     }
 
@@ -205,7 +221,7 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
       setLoading(true);
       
       const notificationData: CreateNotificationRequest = {
-        title: `Notificación de Institución`,
+        title: title.trim(),
         message: message.trim(),
         type: messageType,
         accountId: accountId,
@@ -218,6 +234,7 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
       await NotificationService.sendNotification(notificationData);
       
       // Limpiar formulario
+      setTitle('');
       setMessage('');
       setSelectedDivision('');
       setSelectedStudents([]);
@@ -235,6 +252,7 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
   };
 
   const handleClose = () => {
+    setTitle('');
     setMessage('');
     setSelectedDivision('');
     setSelectedStudents([]);
@@ -295,6 +313,57 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
 
         {/* Form */}
         <div className="space-y-6">
+
+          {/* Título - Movido al principio para mayor visibilidad */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Título <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500">Máximo 100 caracteres</span>
+              <span className={`text-xs ${title.length > 100 ? 'text-red-500' : 'text-gray-500'}`}>
+                {title.length}/100
+              </span>
+            </div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => {
+                if (e.target.value.length <= 100) {
+                  setTitle(e.target.value);
+                }
+              }}
+              placeholder="Ingresa el título de la notificación"
+              maxLength={100}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Mensaje */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <MessageSquare className="h-4 w-4 inline mr-1" />
+              Mensaje <span className="text-red-500">*</span>
+            </label>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500">Máximo 256 caracteres</span>
+              <span className={`text-xs ${message.length > 256 ? 'text-red-500' : 'text-gray-500'}`}>
+                {message.length}/256
+              </span>
+            </div>
+            <textarea
+              value={message}
+              onChange={(e) => {
+                if (e.target.value.length <= 256) {
+                  setMessage(e.target.value);
+                }
+              }}
+              placeholder="Escribe tu mensaje aquí..."
+              rows={4}
+              maxLength={256}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
 
           {/* Selección de sala */}
           <div>
@@ -378,24 +447,6 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
               )}
             </div>
           )}
-
-          {/* Mensaje */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <MessageSquare className="h-4 w-4 inline mr-1" />
-              Mensaje
-            </label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Escribe tu mensaje aquí..."
-              rows={4}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            />
-            <div className="text-sm text-gray-500 mt-1">
-              {message.length} caracteres
-            </div>
-          </div>
         </div>
 
         {/* Actions */}
@@ -409,7 +460,7 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
           </button>
           <button
             onClick={handleSendNotification}
-            disabled={loading || !message.trim() || selectedStudents.length === 0}
+            disabled={loading || !title.trim() || !message.trim() || selectedStudents.length === 0 || title.length > 100 || message.length > 256}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
             {loading ? (

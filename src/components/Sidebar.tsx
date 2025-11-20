@@ -39,22 +39,28 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection, onSectionChange }) => {
   const { logout, user } = useAuth();
 
-  const menuItems: SidebarItem[] = [
-    ...(user?.role?.nombre === 'superadmin' ? [{ icon: Home, label: 'Dashboard', key: 'dashboard' }] : []),
-    ...(user?.role?.nombre === 'superadmin' ? [{ icon: CreditCard, label: 'Instituciones', key: 'accounts' }] : []),
-    { icon: Users, label: 'Usuarios', key: 'usuarios' },
-    { icon: Activity, label: 'Activity', key: 'activity' },
-    { icon: Calendar, label: 'Eventos', key: 'eventos' },
-    { icon: Bell, label: 'Notificaciones', key: 'notificaciones' },
-    { icon: Building2, label: 'Divisiones', key: 'divisiones' },
-    { icon: UserCheck, label: 'Coordinadores', key: 'coordinadores' },
-    { icon: UserPlus, label: 'Tutores', key: 'tutores' },
-    { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
-    { icon: Clock, label: 'Asistencias', key: 'asistencias' },
-    { icon: ClipboardList, label: 'Acciones Diarias', key: 'acciones-diarias' },
-    { icon: Shield, label: 'Quién Retira', key: 'pickup' },
-    ...(user?.role?.nombre === 'adminaccount' ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }] : []),
-  ];
+  const isSuperAdmin = user?.role?.nombre === 'superadmin';
+  
+  // Si es superadmin, solo mostrar Instituciones
+  const menuItems: SidebarItem[] = isSuperAdmin
+    ? [
+        { icon: CreditCard, label: 'Instituciones', key: 'accounts' }
+      ]
+    : [
+        // Resto de opciones para otros roles
+        { icon: Users, label: 'Usuarios', key: 'usuarios' },
+        { icon: Activity, label: 'Activity', key: 'activity' },
+        { icon: Calendar, label: 'Eventos', key: 'eventos' },
+        { icon: Bell, label: 'Notificaciones', key: 'notificaciones' },
+        { icon: Building2, label: 'Divisiones', key: 'divisiones' },
+        { icon: UserCheck, label: 'Coordinadores', key: 'coordinadores' },
+        { icon: UserPlus, label: 'Tutores', key: 'tutores' },
+        { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
+        { icon: Clock, label: 'Asistencias', key: 'asistencias' },
+        { icon: ClipboardList, label: 'Acciones Diarias', key: 'acciones-diarias' },
+        { icon: Shield, label: 'Quién Retira', key: 'pickup' },
+        ...(user?.role?.nombre === 'adminaccount' ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }] : []),
+      ];
 
   const handleSectionClick = (sectionKey: string) => {
     onSectionChange(sectionKey);
@@ -76,15 +82,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } lg:translate-x-0 lg:static lg:z-0`}>
         
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">KIKI</h2>
-          <button
-            onClick={onClose}
-            className="lg:hidden text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+        {/* Header con Logo */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <img 
+              src="/kiki_splash.png" 
+              alt="Kiki Logo" 
+              className="h-[100px] w-auto"
+            />
+            <button
+              onClick={onClose}
+              className="lg:hidden text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}

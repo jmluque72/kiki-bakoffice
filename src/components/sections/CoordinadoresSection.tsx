@@ -51,9 +51,10 @@ interface Coordinador {
 
 interface CoordinadoresSectionProps {
   userRole: string;
+  isReadonly?: boolean;
 }
 
-const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
+const CoordinadoresSection = ({ userRole, isReadonly = false }: CoordinadoresSectionProps) => {
   const [coordinadores, setCoordinadores] = useState<Coordinador[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
@@ -202,6 +203,12 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
   };
 
   const handleUploadSubmit = async () => {
+    // Superadmin no puede cargar coordinadores
+    if (userRole === 'superadmin') {
+      setError('Los superadministradores solo pueden crear instituciones. La carga de coordinadores debe realizarse desde la institución.');
+      return;
+    }
+    
     if (!uploadFile || !selectedDivisionForUpload) return;
 
     const formData = new FormData();
@@ -240,7 +247,8 @@ const CoordinadoresSection = ({ userRole }: CoordinadoresSectionProps) => {
     return activo ? 'Activo' : 'Inactivo';
   };
 
-  const canManageCoordinadores = userRole === 'superadmin' || userRole === 'adminaccount';
+  // Superadmin no puede gestionar coordinadores, solo adminaccount
+  const canManageCoordinadores = userRole === 'adminaccount';
 
   return (
     <Box sx={{ p: 3 }}>

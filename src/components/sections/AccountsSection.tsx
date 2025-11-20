@@ -19,7 +19,11 @@ interface InstitutionFormData {
   activo: boolean;
 }
 
-export const AccountsSection: React.FC = () => {
+interface AccountsSectionProps {
+  isReadonly?: boolean;
+}
+
+export const AccountsSection: React.FC<AccountsSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
   const isSuperAdmin = user?.role?.nombre === 'superadmin';
   
@@ -48,6 +52,10 @@ export const AccountsSection: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalAccounts, setTotalAccounts] = useState(0);
+  const [accountConfig, setAccountConfig] = useState<{
+    requiereAprobarActividades: boolean;
+  } | null>(null);
+  const [loadingConfig, setLoadingConfig] = useState(false);
 
   const getStatusColor = (status: Institution['status']) => {
     switch (status) {
@@ -101,7 +109,7 @@ export const AccountsSection: React.FC = () => {
   const activeInstitutions = institutions.filter(inst => inst.activo).length;
   const pendingInstitutions = institutions.filter(inst => !inst.activo).length;
 
-  const openModal = (account?: Account) => {
+  const openModal = async (account?: Account) => {
     
     if (account) {
       setEditingAccount(account);
@@ -125,6 +133,23 @@ export const AccountsSection: React.FC = () => {
         setCurrentImageKey('');
         setCurrentImageUrl('');
       }
+
+      // Cargar configuración de la cuenta
+      try {
+        setLoadingConfig(true);
+        const configData = await AccountService.getAccountConfig(account._id);
+        setAccountConfig({
+          requiereAprobarActividades: configData.requiereAprobarActividades
+        });
+      } catch (err: any) {
+        console.error('Error cargando configuración:', err);
+        // Si no existe, usar valores por defecto
+        setAccountConfig({
+          requiereAprobarActividades: true
+        });
+      } finally {
+        setLoadingConfig(false);
+      }
     } else {
       setEditingAccount(null);
       setFormData({
@@ -138,6 +163,7 @@ export const AccountsSection: React.FC = () => {
       });
       setCurrentImageKey('');
       setCurrentImageUrl('');
+      setAccountConfig(null);
     }
     setShowModal(true);
   };
@@ -210,6 +236,17 @@ export const AccountsSection: React.FC = () => {
         // Si se subió una imagen, actualizar el logo en S3
         if (currentImageKey) {
           await UploadService.updateAccountLogo(newAccount._id, currentImageKey);
+        }
+      }
+      
+      // Guardar configuración si estamos editando
+      if (editingAccount && accountConfig) {
+        try {
+          await AccountService.updateAccountConfig(editingAccount._id, accountConfig);
+          console.log('✅ Configuración guardada exitosamente');
+        } catch (err: any) {
+          console.error('Error guardando configuración:', err);
+          // No bloquear el guardado de la cuenta si falla la configuración
         }
       }
       
@@ -329,13 +366,21 @@ export const AccountsSection: React.FC = () => {
             </div>
           </div>
 
-          <button 
-            onClick={() => openModal()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nueva Institución
-          </button>
+          {!isReadonly && (
+            <button 
+              onClick={() => openModal()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Nueva Institución
+            </button>
+          )}
+          {isReadonly && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed">
+              <Plus className="w-4 h-4" />
+              Nueva Institución (Solo lectura)
+            </div>
+          )}
         </div>
       </div>
 
@@ -400,7 +445,7 @@ export const AccountsSection: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
-                      {isSuperAdmin && (
+                      {!isReadonly && isSuperAdmin && (
                         <>
                           <button 
                             onClick={() => handleCreateAdminUser(institution)}
@@ -418,7 +463,7 @@ export const AccountsSection: React.FC = () => {
                           </button>
                         </>
                       )}
-                      {!isSuperAdmin && (
+                      {!isReadonly && !isSuperAdmin && (
                         <button 
                           onClick={() => openModal(institution)}
                           className="text-blue-600 hover:text-blue-800 p-1 rounded"
@@ -426,6 +471,9 @@ export const AccountsSection: React.FC = () => {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
+                      )}
+                      {isReadonly && (
+                        <span className="text-gray-400 text-xs">Solo lectura</span>
                       )}
                     </div>
                   </td>
@@ -468,6 +516,14 @@ export const AccountsSection: React.FC = () => {
 
             <div className="p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
+                {isReadonly && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center">
+                      <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+                      <span className="text-yellow-800 text-sm font-medium">Modo solo lectura - No se pueden realizar cambios</span>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Nombre de la Institución
@@ -477,7 +533,8 @@ export const AccountsSection: React.FC = () => {
                     name="nombre"
                     value={formData.nombre}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadonly}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -490,8 +547,9 @@ export const AccountsSection: React.FC = () => {
                     name="address"
                     value={formData.address}
                     onChange={handleInputChange}
+                    disabled={isReadonly}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -505,7 +563,8 @@ export const AccountsSection: React.FC = () => {
                     name="razonSocial"
                     value={formData.razonSocial}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadonly}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -519,7 +578,8 @@ export const AccountsSection: React.FC = () => {
                     name="emailAdmin"
                     value={formData.emailAdmin}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadonly}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -533,7 +593,8 @@ export const AccountsSection: React.FC = () => {
                     name="nombreAdmin"
                     value={formData.nombreAdmin}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadonly}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     required
                   />
                 </div>
@@ -557,12 +618,49 @@ export const AccountsSection: React.FC = () => {
                     name="activo"
                     value={formData.activo ? 'true' : 'false'}
                     onChange={(e) => setFormData(prev => ({ ...prev, activo: e.target.value === 'true' }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={isReadonly}
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${isReadonly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   >
                     <option value="true">Activa</option>
                     <option value="false">Inactiva</option>
                   </select>
                 </div>
+
+                {/* Configuración de la institución - Solo al editar */}
+                {editingAccount && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Configuración de Actividades</h4>
+                    {loadingConfig ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                        <span className="ml-2 text-sm text-gray-600">Cargando configuración...</span>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="flex items-center space-x-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={accountConfig?.requiereAprobarActividades ?? true}
+                            onChange={(e) => setAccountConfig(prev => ({
+                              ...prev,
+                              requiereAprobarActividades: e.target.checked
+                            } as any))}
+                            disabled={isReadonly}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-gray-900">
+                              Requerir aprobación de actividades
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Si está activado, las actividades se crean en estado "borrador" y deben ser aprobadas antes de publicarse. Si está desactivado, las actividades se publican automáticamente.
+                            </p>
+                          </div>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex gap-3 justify-end pt-4">
                   <button
@@ -574,7 +672,12 @@ export const AccountsSection: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={isReadonly}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      isReadonly 
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
                   >
                     {editingAccount ? 'Actualizar Institución' : 'Agregar Institución'}
                   </button>
