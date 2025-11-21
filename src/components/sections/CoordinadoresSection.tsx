@@ -27,6 +27,7 @@ import {
   MenuItem
 } from '@mui/material';
 import { Upload, Download, Users } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { AccountService } from '../../services/accountService';
 import { Account, apiClient } from '../../config/api';
 
@@ -95,14 +96,22 @@ const CoordinadoresSection = ({ userRole, isReadonly = false }: CoordinadoresSec
     try {
       setLoading(true);
       
-      let url = `/api/coordinators`;
-      if (selectedDivision) {
-        url = `/api/coordinators/by-division/${selectedDivision}`;
-      }
+      // Siempre usar el endpoint que trae todos de la institución
+      // Si hay división seleccionada, se filtrará en el frontend
+      const url = `/api/coordinators`;
       
       const response = await apiClient.get(url);
-      setCoordinadores(response.data.data.coordinadores || []);
-      setTotalPages(Math.ceil((response.data.data.coordinadores?.length || 0) / 10));
+      let coordinadores = response.data.data.coordinadores || [];
+      
+      // Filtrar por división si está seleccionada
+      if (selectedDivision) {
+        coordinadores = coordinadores.filter((coord: Coordinador) => 
+          coord.division?._id === selectedDivision
+        );
+      }
+      
+      setCoordinadores(coordinadores);
+      setTotalPages(Math.ceil(coordinadores.length / 10));
     } catch (error) {
       console.error('Error al cargar coordinadores:', error);
       setError('Error al cargar coordinadores');
@@ -247,6 +256,65 @@ const CoordinadoresSection = ({ userRole, isReadonly = false }: CoordinadoresSec
     return activo ? 'Activo' : 'Inactivo';
   };
 
+  const handleExportCoordinators = () => {
+    if (coordinadores.length === 0) {
+      setError('No hay coordinadores para exportar');
+      return;
+    }
+
+    try {
+      // Aplicar filtros si existen
+      let dataToExport = coordinadores;
+      
+      if (filterName) {
+        dataToExport = dataToExport.filter(coordinador =>
+          coordinador.nombre.toLowerCase().includes(filterName.toLowerCase())
+        );
+      }
+      
+      if (filterEmail) {
+        dataToExport = dataToExport.filter(coordinador =>
+          coordinador.email.toLowerCase().includes(filterEmail.toLowerCase())
+        );
+      }
+
+      // Preparar datos para Excel
+      const excelData = dataToExport.map(coordinator => ({
+        'Nombre': coordinator.nombre || '',
+        'Email': coordinator.email || '',
+        'División': coordinator.division?.nombre || 'N/A',
+        'Institución': coordinator.account?.nombre || 'N/A',
+        'Estado': coordinator.activo ? 'Activo' : 'Inactivo',
+        'Fecha de Asociación': new Date(coordinator.fechaAsociacion).toLocaleDateString('es-AR')
+      }));
+
+      // Crear workbook y worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Coordinadores');
+
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 30 }, // Nombre
+        { wch: 35 }, // Email
+        { wch: 20 }, // División
+        { wch: 25 }, // Institución
+        { wch: 15 }, // Estado
+        { wch: 20 }  // Fecha de Asociación
+      ];
+      ws['!cols'] = colWidths;
+
+      // Generar nombre de archivo con fecha
+      const fileName = `coordinadores_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error al exportar coordinadores:', error);
+      setError('Error al exportar coordinadores a Excel');
+    }
+  };
+
   // Superadmin no puede gestionar coordinadores, solo adminaccount
   const canManageCoordinadores = userRole === 'adminaccount';
 
@@ -367,7 +435,7 @@ const CoordinadoresSection = ({ userRole, isReadonly = false }: CoordinadoresSec
           ) : coordinadores.length === 0 ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <Typography color="text.secondary">
-                {selectedAccount ? 'No hay coordinadores en la selección actual' : 'Selecciona una institución para ver coordinadores'}
+                {selectedAccount || userRole === 'adminaccount' ? 'No hay coordinadores en la institución' : 'Selecciona una institución para ver coordinadores'}
               </Typography>
             </Box>
           ) : (
@@ -390,10 +458,19 @@ const CoordinadoresSection = ({ userRole, isReadonly = false }: CoordinadoresSec
 
                 return (
                   <>
-                    <Box sx={{ mb: 2 }}>
+                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant="body2" color="text.secondary">
                         Mostrando {filteredCoordinadores.length} de {coordinadores.length} coordinadores
                       </Typography>
+                      <Button
+                        onClick={handleExportCoordinators}
+                        startIcon={<Download size={16} />}
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                      >
+                        Exportar a Excel
+                      </Button>
                     </Box>
                     
                     <TableContainer component={Paper}>

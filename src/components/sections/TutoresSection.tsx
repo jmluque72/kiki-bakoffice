@@ -26,7 +26,8 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
-import { Upload, Download, Users } from 'lucide-react';
+import { Upload, Download, Users, Search } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { AccountService } from '../../services/accountService';
 import { Account, apiClient } from '../../config/api';
 
@@ -69,8 +70,7 @@ const TutoresSection = ({ userRole, isReadonly = false }: TutoresSectionProps) =
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [filterName, setFilterName] = useState<string>('');
-  const [filterEmail, setFilterEmail] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const loadAccounts = useCallback(async () => {
     // Solo cargar accounts si es superadmin
@@ -97,21 +97,21 @@ const TutoresSection = ({ userRole, isReadonly = false }: TutoresSectionProps) =
     try {
       setLoading(true);
       
-      let url = `/api/tutors`;
-      if (selectedDivision) {
-        url = `/api/tutors/by-division/${selectedDivision}`;
-      }
+      // Siempre usar el endpoint que trae todos de la institución
+      const url = `/api/tutors`;
       
       const response = await apiClient.get(url);
-      setTutores(response.data.data.tutores || []);
-      setTotalPages(Math.ceil((response.data.data.tutores?.length || 0) / 10));
+      const tutores = response.data.data.tutores || [];
+      
+      setTutores(tutores);
+      setTotalPages(Math.ceil(tutores.length / 10));
     } catch (error) {
       console.error('Error al cargar tutores:', error);
       setError('Error al cargar tutores');
     } finally {
       setLoading(false);
     }
-  }, [selectedDivision]);
+  }, []);
 
   useEffect(() => {
     loadAccounts();
@@ -171,6 +171,70 @@ const TutoresSection = ({ userRole, isReadonly = false }: TutoresSectionProps) =
     return activo ? 'Activo' : 'Inactivo';
   };
 
+  const handleExportTutores = () => {
+    if (tutores.length === 0) {
+      setError('No hay tutores para exportar');
+      return;
+    }
+
+    try {
+      // Aplicar filtro de búsqueda si existe
+      let dataToExport = tutores;
+      
+      if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        dataToExport = dataToExport.filter(tutor => {
+          const nombre = tutor.nombre?.toLowerCase() || '';
+          const email = tutor.email?.toLowerCase() || '';
+          const division = tutor.division?.nombre?.toLowerCase() || '';
+          const alumno = tutor.student ? `${tutor.student.nombre} ${tutor.student.apellido}`.toLowerCase() : '';
+          
+          return nombre.includes(search) || 
+                 email.includes(search) || 
+                 division.includes(search) ||
+                 alumno.includes(search);
+        });
+      }
+
+      // Preparar datos para Excel
+      const excelData = dataToExport.map(tutor => ({
+        'Nombre': tutor.nombre || '',
+        'Email': tutor.email || '',
+        'División': tutor.division?.nombre || 'N/A',
+        'Institución': tutor.account?.nombre || 'N/A',
+        'Alumno Asignado': tutor.student ? `${tutor.student.nombre} ${tutor.student.apellido}` : 'N/A',
+        'Estado': tutor.activo ? 'Activo' : 'Inactivo',
+        'Fecha de Asociación': new Date(tutor.fechaAsociacion).toLocaleDateString('es-AR')
+      }));
+
+      // Crear workbook y worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Tutores');
+
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 30 }, // Nombre
+        { wch: 35 }, // Email
+        { wch: 20 }, // División
+        { wch: 25 }, // Institución
+        { wch: 25 }, // Alumno Asignado
+        { wch: 15 }, // Estado
+        { wch: 20 }  // Fecha de Asociación
+      ];
+      ws['!cols'] = colWidths;
+
+      // Generar nombre de archivo con fecha
+      const fileName = `tutores_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error al exportar tutores:', error);
+      setError('Error al exportar tutores a Excel');
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -207,58 +271,24 @@ const TutoresSection = ({ userRole, isReadonly = false }: TutoresSectionProps) =
               </FormControl>
             )}
 
-            {userRole === 'superadmin' && selectedAccount && (
-              <FormControl sx={{ minWidth: 200 }}>
-                <InputLabel>División</InputLabel>
-                <Select
-                  value={selectedDivision}
-                  onChange={(e) => handleDivisionChange(e.target.value)}
-                  label="División"
-                >
-                  <MenuItem value="">Todas las divisiones</MenuItem>
-                  {divisions.map((division) => (
-                    <MenuItem key={division._id} value={division._id}>
-                      {division.nombre}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-
-            {userRole === 'adminaccount' && (
-              <FormControl sx={{ minWidth: 200 }}>
-                <InputLabel>División</InputLabel>
-                <Select
-                  value={selectedDivision}
-                  onChange={(e) => handleDivisionChange(e.target.value)}
-                  label="División"
-                >
-                  <MenuItem value="">Todas las divisiones</MenuItem>
-                  {divisions.map((division) => (
-                    <MenuItem key={division._id} value={division._id}>
-                      {division.nombre}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
           </Box>
 
-          {/* Filtros adicionales */}
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mt: 2 }}>
+          {/* Filtro de búsqueda */}
+          <Box sx={{ mt: 2 }}>
             <TextField
-              label="Filtrar por nombre"
-              value={filterName}
-              onChange={(e) => setFilterName(e.target.value)}
+              label="Buscar"
+              placeholder="Buscar por nombre, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
-              sx={{ minWidth: 200 }}
-            />
-            <TextField
-              label="Filtrar por email"
-              value={filterEmail}
-              onChange={(e) => setFilterEmail(e.target.value)}
-              size="small"
-              sx={{ minWidth: 200 }}
+              fullWidth
+              InputProps={{
+                startAdornment: (
+                  <Box sx={{ display: 'flex', alignItems: 'center', mr: 1 }}>
+                    <Search size={16} style={{ color: '#9CA3AF' }} />
+                  </Box>
+                )
+              }}
             />
           </Box>
         </CardContent>
@@ -274,33 +304,45 @@ const TutoresSection = ({ userRole, isReadonly = false }: TutoresSectionProps) =
           ) : tutores.length === 0 ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <Typography color="text.secondary">
-                {selectedAccount ? 'No hay tutores en la selección actual' : 'Selecciona una institución para ver tutores'}
+                {selectedAccount || userRole === 'adminaccount' ? 'No hay tutores en la institución' : 'Selecciona una institución para ver tutores'}
               </Typography>
             </Box>
           ) : (
             <>
               {(() => {
-                // Aplicar filtros
+                // Aplicar filtro de búsqueda
                 let filteredTutores = tutores;
                 
-                if (filterName) {
-                  filteredTutores = filteredTutores.filter(tutor =>
-                    tutor.nombre.toLowerCase().includes(filterName.toLowerCase())
-                  );
-                }
-                
-                if (filterEmail) {
-                  filteredTutores = filteredTutores.filter(tutor =>
-                    tutor.email.toLowerCase().includes(filterEmail.toLowerCase())
-                  );
+                if (searchTerm) {
+                  const search = searchTerm.toLowerCase();
+                  filteredTutores = filteredTutores.filter(tutor => {
+                    const nombre = tutor.nombre?.toLowerCase() || '';
+                    const email = tutor.email?.toLowerCase() || '';
+                    const division = tutor.division?.nombre?.toLowerCase() || '';
+                    const alumno = tutor.student ? `${tutor.student.nombre} ${tutor.student.apellido}`.toLowerCase() : '';
+                    
+                    return nombre.includes(search) || 
+                           email.includes(search) || 
+                           division.includes(search) ||
+                           alumno.includes(search);
+                  });
                 }
 
                 return (
                   <>
-                    <Box sx={{ mb: 2 }}>
+                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography variant="body2" color="text.secondary">
                         Mostrando {filteredTutores.length} de {tutores.length} tutores
                       </Typography>
+                      <Button
+                        onClick={handleExportTutores}
+                        startIcon={<Download size={16} />}
+                        variant="outlined"
+                        color="primary"
+                        size="small"
+                      >
+                        Exportar a Excel
+                      </Button>
                     </Box>
                     
                     <TableContainer component={Paper}>

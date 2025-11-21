@@ -112,25 +112,42 @@ export const UsuariosSection: React.FC<UsuariosSectionProps> = ({ isReadonly = f
       console.log('📞 [FRONTEND] Llamando a userService.getUsers...');
       const response = await userService.getUsers(currentPage, 10, searchTerm);
       console.log('✅ [FRONTEND] Respuesta recibida de userService.getUsers');
-      console.log('📊 [FRONTEND] Respuesta completa del servicio:', response);
+      console.log('📊 [FRONTEND] Respuesta completa del servicio:', JSON.stringify(response, null, 2));
       console.log('📊 [FRONTEND] response.data:', response.data);
       console.log('📊 [FRONTEND] response.data.stats:', response.data?.stats);
-      setUsers(response.data.users);
-      setTotalUsers(response.data.total);
-      setTotalPages(Math.ceil(response.data.total / 10));
-      // Usar estadísticas del servidor si están disponibles
-      if (response.data?.stats) {
-        console.log('📊 [FRONTEND] Estableciendo stats:', response.data.stats);
-        setStats(response.data.stats);
-      } else {
-        console.warn('⚠️ [FRONTEND] No se recibieron stats del servidor. response.data:', response.data);
-        // Si no hay stats, al menos usar el total
-        if (response.data?.total) {
-          setStats(prev => ({ ...prev, total: response.data.total }));
+      
+      // El servicio devuelve response.data del axios, que es el objeto completo del backend
+      // Estructura: { success: true, data: { users: [], total: 0, stats: {} } }
+      if (response && response.data) {
+        setUsers(response.data.users || []);
+        setTotalUsers(response.data.total || 0);
+        setTotalPages(Math.ceil((response.data.total || 0) / 10));
+        
+        // Usar estadísticas del servidor si están disponibles
+        if (response.data.stats) {
+          console.log('📊 [FRONTEND] Estableciendo stats:', JSON.stringify(response.data.stats, null, 2));
+          setStats({
+            total: response.data.stats.total || 0,
+            active: response.data.stats.active || 0,
+            inactive: response.data.stats.inactive || 0,
+            coordinadores: response.data.stats.coordinadores || 0,
+            familiares: response.data.stats.familiares || 0,
+            tutores: response.data.stats.tutores || 0,
+            familyadmin: response.data.stats.familyadmin || 0
+          });
+        } else {
+          console.warn('⚠️ [FRONTEND] No se recibieron stats del servidor. response.data:', response.data);
+          // Si no hay stats, al menos usar el total
+          if (response.data.total !== undefined) {
+            setStats(prev => ({ ...prev, total: response.data.total }));
+          }
         }
+      } else {
+        console.error('❌ [FRONTEND] Respuesta inválida:', response);
+        setError('Error: respuesta inválida del servidor');
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('❌ [FRONTEND] Error fetching users:', error);
       setError('Error al cargar usuarios');
     } finally {
       setLoading(false);

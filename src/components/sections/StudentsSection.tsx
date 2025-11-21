@@ -70,7 +70,6 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadYear, setUploadYear] = useState(new Date().getFullYear());
@@ -99,17 +98,39 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
 
+  // Obtener cuenta del usuario si es adminaccount
+  useEffect(() => {
+    if (!isSuperAdmin && !currentAccount && user) {
+      const loadUserAccount = async () => {
+        try {
+          const response = await apiClient.get(`/api/users/profile`);
+          const userData = response.data;
+          if (userData.associations && userData.associations.length > 0) {
+            const account = userData.associations[0].account;
+            setCurrentAccount(account);
+          }
+        } catch (error) {
+          console.error('Error cargando cuenta del usuario:', error);
+        }
+      };
+      loadUserAccount();
+    }
+  }, [isSuperAdmin, currentAccount, user]);
+
   // Cargar alumnos
   const loadStudents = async () => {
-    if (!currentAccount?._id || !currentDivision?._id) return;
+    // Para adminaccount, cargar todos de la institución
+    // Para superadmin, requiere accountId
+    if (!isSuperAdmin && !currentAccount?._id) return;
+    if (isSuperAdmin && !currentAccount?._id) return;
 
     setLoading(true);
     try {
       const response = await apiClient.get('/api/students', {
         params: {
-          accountId: currentAccount._id,
-          divisionId: currentDivision._id,
-          year: selectedYear
+          accountId: currentAccount._id
+          // No enviar divisionId para obtener todos
+          // No enviar year para obtener todos los años
         }
       });
 
@@ -403,16 +424,91 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
 
   useEffect(() => {
     loadStudents();
-  }, [currentAccount, currentDivision, selectedYear]);
+  }, [currentAccount]);
 
-  if (!currentAccount || !currentDivision) {
+  const handleExportStudents = () => {
+    if (students.length === 0) {
+      Notification.error('No hay alumnos para exportar');
+      return;
+    }
+
+    try {
+      // Aplicar filtros si existen
+      let dataToExport = students;
+      
+      if (searchTerm) {
+        const search = searchTerm?.toLowerCase() || '';
+        dataToExport = students.filter(student => {
+          const nombre = student.nombre?.toLowerCase() || '';
+          const apellido = student.apellido?.toLowerCase() || '';
+          const email = student.email?.toLowerCase() || '';
+          const dni = student.dni?.toLowerCase() || '';
+          const tutorName = student.tutor?.name?.toLowerCase() || '';
+          const tutorEmail = student.tutor?.email?.toLowerCase() || '';
+          
+          return nombre.includes(search) || 
+                 apellido.includes(search) || 
+                 email.includes(search) || 
+                 dni.includes(search);
+        });
+      }
+
+      // Preparar datos para Excel
+      const excelData = dataToExport.map(student => ({
+        'Nombre': student.nombre || '',
+        'Apellido': student.apellido || '',
+        'DNI': student.dni || '',
+        'División': student.division?.nombre || 'N/A',
+        'Año': student.year || '',
+        'Fecha de Registro': new Date(student.createdAt).toLocaleDateString('es-AR')
+      }));
+
+      // Crear workbook y worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Alumnos');
+
+      // Ajustar ancho de columnas
+      const colWidths = [
+        { wch: 20 }, // Nombre
+        { wch: 20 }, // Apellido
+        { wch: 15 }, // DNI
+        { wch: 20 }, // División
+        { wch: 10 }, // Año
+        { wch: 18 }  // Fecha de Registro
+      ];
+      ws['!cols'] = colWidths;
+
+      // Generar nombre de archivo con fecha
+      const fileName = `alumnos_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Error al exportar alumnos:', error);
+      Notification.error('Error al exportar alumnos a Excel');
+    }
+  };
+
+  if (!currentAccount && !isSuperAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Selecciona una institución y división</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Cargando información...</h3>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSuperAdmin && !currentAccount) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Users className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Selecciona una institución</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Para ver y gestionar alumnos, primero selecciona una institución y división.
+            Para ver y gestionar alumnos, primero selecciona una institución.
           </p>
         </div>
       </div>
@@ -426,17 +522,17 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Alumnos</h2>
           <p className="text-gray-600">
-            {currentAccount.nombre} - {currentDivision.nombre}
+            {currentAccount.nombre}
           </p>
         </div>
         
         <div className="flex items-center space-x-3">
           <button
-            onClick={downloadTemplate}
+            onClick={handleExportStudents}
             className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             <Download className="h-4 w-4 mr-2" />
-            Plantilla
+            Exportar a Excel
           </button>
           
           <button
@@ -448,70 +544,24 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
             {generatingQR ? 'Generando...' : 'Generar QR'}
           </button>
           
-          <button
-            onClick={() => {
-              if (isSuperAdmin) {
-                Notification.error('Los superadministradores solo pueden crear instituciones. La carga de alumnos debe realizarse desde la institución.');
-                return;
-              }
-              setShowUploadModal(true);
-            }}
-            disabled={isSuperAdmin}
-            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-              isSuperAdmin 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
-            title={isSuperAdmin ? 'Los superadministradores solo pueden crear instituciones' : ''}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Cargar Excel
-          </button>
         </div>
       </div>
 
       {/* Filtros */}
       <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Buscar
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre, email, DNI o tutor..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Año
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              {years.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex items-end">
-            <button
-              onClick={loadStudents}
-              disabled={loading}
-              className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Cargando...' : 'Actualizar'}
-            </button>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Buscar
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre, email, DNI..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
           </div>
         </div>
       </div>
@@ -551,7 +601,7 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                     DNI
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tutor
+                    División
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Año
@@ -580,14 +630,7 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {student.tutor ? (
-                          <div>
-                            <div className="font-medium">{student.tutor.name}</div>
-                            <div className="text-gray-500 text-xs">{student.tutor.email}</div>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">Sin tutor</span>
-                        )}
+                        {student.division?.nombre || 'N/A'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

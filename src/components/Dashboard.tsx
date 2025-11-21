@@ -16,6 +16,7 @@ import CoordinadoresSection from './sections/CoordinadoresSection';
 import TutoresSection from './sections/TutoresSection';
 import { DocumentsSection } from './sections/DocumentsSection';
 import { StudentActionsSection } from './sections/StudentActionsSection';
+import { FormulariosSection } from './sections/FormulariosSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -78,6 +79,8 @@ export const Dashboard: React.FC = () => {
         return <StudentsSection isReadonly={isSuperAdmin} />;
       case 'pickup':
         return <PickupSection isReadonly={isSuperAdmin} />;
+      case 'formularios':
+        return <FormulariosSection isReadonly={isSuperAdmin} />;
       case 'documentos':
         return <DocumentsSection isReadonly={isSuperAdmin} />;
       case 'dashboard':

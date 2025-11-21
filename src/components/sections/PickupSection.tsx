@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { useApi } from '../../hooks/useApi';
+import { apiClient } from '../../config/api';
 import { 
   Table, 
   TableBody, 
@@ -29,14 +29,13 @@ import {
 import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { 
-  Plus, 
-  Edit, 
-  Trash2, 
   Search, 
   Filter,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface Pickup {
   _id: string;
@@ -52,13 +51,21 @@ interface Pickup {
     _id: string;
     nombre: string;
     apellido: string;
+    tutor?: {
+      _id: string;
+      name?: string;
+      nombre?: string;
+      apellido?: string;
+      email?: string;
+    };
   };
   nombre: string;
   apellido: string;
   dni: string;
   createdBy: {
     _id: string;
-    name: string;
+    name?: string;
+    email?: string;
   };
   status: 'active' | 'inactive';
   createdAt: string;
@@ -82,7 +89,6 @@ interface PickupSectionProps {
 
 const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => {
   const { user } = useAuth();
-  const { apiClient } = useApi();
   
   const [pickups, setPickups] = useState<Pickup[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -98,7 +104,9 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
   // Estados para filtros
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [pickupSearch, setPickupSearch] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [tutorSearch, setTutorSearch] = useState('');
   
   // Estados para modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -111,17 +119,57 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
     dni: ''
   });
 
+  // Obtener accountId según el rol del usuario
+  const getAccountId = async (): Promise<string | null> => {
+    if (!user) return null;
+    
+    // Para superadmin, necesitaría seleccionar una cuenta (por ahora retornamos null)
+    if (user.role?.nombre === 'superadmin') {
+      // TODO: Implementar selector de cuenta para superadmin
+      return null;
+    }
+    
+    // Para adminaccount, obtener de las asociaciones
+    if (user.role?.nombre === 'adminaccount') {
+      try {
+        const response = await apiClient.get(`/api/users/profile`);
+        const userData = response.data;
+        if (userData.associations && userData.associations.length > 0) {
+          return userData.associations[0].account._id;
+        }
+      } catch (error) {
+        console.error('Error obteniendo cuenta del usuario:', error);
+      }
+    }
+    
+    // Fallback: intentar desde user.account
+    return user.account?._id || null;
+  };
+
   // Cargar datos iniciales
   useEffect(() => {
-    loadPickups();
-    loadDivisions();
-  }, [pagination.page, selectedDivision, selectedStudent]);
+    if (!user) return;
+    
+    const loadData = async () => {
+      const accountId = await getAccountId();
+      if (accountId) {
+        await loadPickups(accountId);
+        await loadDivisions(accountId);
+      }
+    };
+    
+    loadData();
+  }, [user, pagination.page, selectedDivision, selectedStudent]);
 
-  const loadPickups = async () => {
+  const loadPickups = async (accountId?: string) => {
     try {
       setLoading(true);
-      const accountId = user?.account?._id;
-      if (!accountId) return;
+      const finalAccountId = accountId || await getAccountId();
+      if (!finalAccountId) {
+        console.log('No se pudo obtener accountId');
+        setLoading(false);
+        return;
+      }
 
       const params = new URLSearchParams({
         page: pagination.page.toString(),
@@ -135,7 +183,7 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
         params.append('student', selectedStudent);
       }
 
-      const response = await apiClient.get(`/pickup/account/${accountId}?${params}`);
+      const response = await apiClient.get(`/pickup/account/${finalAccountId}?${params}`);
       
       if (response.data.success) {
         setPickups(response.data.data);
@@ -152,12 +200,12 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
     }
   };
 
-  const loadDivisions = async () => {
+  const loadDivisions = async (accountId?: string) => {
     try {
-      const accountId = user?.account?._id;
-      if (!accountId) return;
+      const finalAccountId = accountId || await getAccountId();
+      if (!finalAccountId) return;
 
-      const response = await apiClient.get(`/divisions/account/${accountId}`);
+      const response = await apiClient.get(`/divisions/account/${finalAccountId}`);
       if (response.data.success) {
         setDivisions(response.data.data);
       }
@@ -188,8 +236,11 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
 
   const handleCreatePickup = async () => {
     try {
-      const accountId = user?.account?._id;
-      if (!accountId) return;
+      const accountId = await getAccountId();
+      if (!accountId) {
+        alert('No se pudo obtener la cuenta. Por favor, recarga la página.');
+        return;
+      }
 
       const pickupData = {
         account: accountId,
@@ -282,25 +333,98 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
     });
   };
 
+  const getTutorName = (pickup: Pickup) => {
+    const tutor = pickup.student?.tutor;
+    if (tutor) {
+      const tutorFullName = `${tutor.nombre || ''} ${tutor.apellido || ''}`.trim();
+      return tutor.name || tutorFullName || tutor.email || '';
+    }
+    return pickup.createdBy?.name || pickup.createdBy?.email || '';
+  };
+
+  const normalize = (value?: string) => (value || '').toLowerCase();
+
   const filteredPickups = pickups.filter(pickup => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      pickup.nombre.toLowerCase().includes(searchLower) ||
-      pickup.apellido.toLowerCase().includes(searchLower) ||
-      pickup.dni.includes(searchTerm) ||
-      pickup.student.nombre.toLowerCase().includes(searchLower) ||
-      pickup.student.apellido.toLowerCase().includes(searchLower)
-    );
+    const pickupFullName = normalize(`${pickup.nombre} ${pickup.apellido}`);
+    const pickupDni = normalize(pickup.dni);
+    const studentFullName = normalize(`${pickup.student?.nombre || ''} ${pickup.student?.apellido || ''}`);
+    const tutorName = normalize(getTutorName(pickup));
+
+    const pickupSearchLower = normalize(pickupSearch);
+    const studentSearchLower = normalize(studentSearch);
+    const tutorSearchLower = normalize(tutorSearch);
+
+    const matchesPickup = pickupSearchLower
+      ? pickupFullName.includes(pickupSearchLower) || pickupDni.includes(pickupSearchLower)
+      : true;
+
+    const matchesStudent = studentSearchLower
+      ? studentFullName.includes(studentSearchLower)
+      : true;
+
+    const matchesTutor = tutorSearchLower
+      ? tutorName.includes(tutorSearchLower)
+      : true;
+
+    return matchesPickup && matchesStudent && matchesTutor;
   });
+
+  const handleExport = () => {
+    if (filteredPickups.length === 0) {
+      alert('No hay registros para exportar.');
+      return;
+    }
+
+    const exportData = filteredPickups.map(pickup => {
+      const studentName = `${pickup.student?.nombre || ''} ${pickup.student?.apellido || ''}`.trim();
+      const tutorName = getTutorName(pickup) || 'Sin tutor';
+      const pickupName = `${pickup.nombre} ${pickup.apellido}`.trim();
+
+      return {
+        'División': pickup.division?.nombre || '-',
+        'Alumno': studentName || '-',
+        'Tutor': tutorName || '-',
+        'Quién retira': pickupName,
+        'DNI': pickup.dni || '-',
+        'Estado': pickup.status === 'active' ? 'Activo' : 'Inactivo',
+        'Registrado por': pickup.createdBy?.name || pickup.createdBy?.email || '-',
+        'Fecha de registro': pickup.createdAt ? new Date(pickup.createdAt).toLocaleDateString('es-AR') : '-'
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Personas Autorizadas');
+    ws['!cols'] = [
+      { wch: 20 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 25 },
+      { wch: 18 }
+    ];
+
+    const fileName = `quien_retira_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h2 className="text-3xl font-bold">Personas Autorizadas a Retirar</h2>
-        <Button onClick={openCreateModal} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Agregar Persona
-        </Button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={filteredPickups.length === 0}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -311,22 +435,8 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
             Filtros
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="search">Buscar</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="search"
-                  placeholder="Nombre, apellido, DNI..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="division">División</Label>
               <Select value={selectedDivision} onValueChange={handleDivisionChange}>
@@ -361,6 +471,40 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
               </Select>
             </div>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="pickupSearch">Quién retira</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="pickupSearch"
+                  placeholder="Nombre, apellido o DNI de quien retira..."
+                  value={pickupSearch}
+                  onChange={(e) => setPickupSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="studentSearch">Alumno</Label>
+              <Input
+                id="studentSearch"
+                placeholder="Buscar por nombre de alumno..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="tutorSearch">Tutor</Label>
+              <Input
+                id="tutorSearch"
+                placeholder="Buscar por tutor o responsable..."
+                value={tutorSearch}
+                onChange={(e) => setTutorSearch(e.target.value)}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -373,10 +517,10 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
                 <TableHead>Persona Autorizada</TableHead>
                 <TableHead>DNI</TableHead>
                 <TableHead>Estudiante</TableHead>
+                <TableHead>Tutor</TableHead>
                 <TableHead>División</TableHead>
                 <TableHead>Registrado Por</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -406,30 +550,19 @@ const PickupSection: React.FC<PickupSectionProps> = ({ isReadonly = false }) => 
                     <TableCell>
                       {pickup.student.nombre} {pickup.student.apellido}
                     </TableCell>
+                    <TableCell>
+                      {getTutorName(pickup) ? (
+                        <span className="text-sm text-gray-700">{getTutorName(pickup)}</span>
+                      ) : (
+                        <span className="text-sm text-gray-400">Sin tutor</span>
+                      )}
+                    </TableCell>
                     <TableCell>{pickup.division.nombre}</TableCell>
-                    <TableCell>{pickup.createdBy.name}</TableCell>
+                    <TableCell>{pickup.createdBy?.name || pickup.createdBy?.email || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant={pickup.status === 'active' ? 'default' : 'secondary'}>
                         {pickup.status === 'active' ? 'Activo' : 'Inactivo'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditModal(pickup)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeletePickup(pickup._id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))

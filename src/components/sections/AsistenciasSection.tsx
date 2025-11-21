@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Loader2
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useBackofficeAsistencias, AsistenciaFilters } from '../../hooks/useBackofficeAsistencias';
 import { useAuth } from '../../hooks/useAuth';
 import { useDivisions } from '../../hooks/useDivisions';

@@ -53,12 +53,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
         { icon: Calendar, label: 'Eventos', key: 'eventos' },
         { icon: Bell, label: 'Notificaciones', key: 'notificaciones' },
         { icon: Building2, label: 'Divisiones', key: 'divisiones' },
-        { icon: UserCheck, label: 'Coordinadores', key: 'coordinadores' },
         { icon: UserPlus, label: 'Tutores', key: 'tutores' },
         { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
         { icon: Clock, label: 'Asistencias', key: 'asistencias' },
         { icon: ClipboardList, label: 'Acciones Diarias', key: 'acciones-diarias' },
         { icon: Shield, label: 'Quién Retira', key: 'pickup' },
+        { icon: FileText, label: 'Formularios', key: 'formularios' },
         ...(user?.role?.nombre === 'adminaccount' ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }] : []),
       ];
 
