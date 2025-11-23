@@ -57,9 +57,9 @@ export const UsuariosSection: React.FC<UsuariosSectionProps> = ({ isReadonly = f
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterRole === 'all' || user.role.nombre === filterRole;
+    const matchesSearch = (user.nombre || user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterRole === 'all' || user.role?.nombre === filterRole;
     return matchesSearch && matchesFilter;
   });
 
@@ -367,18 +367,18 @@ export const UsuariosSection: React.FC<UsuariosSectionProps> = ({ isReadonly = f
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-600 font-medium">
-                          {user.nombre.split(' ').map((n: string) => n[0]).join('')}
+                          {(user.nombre || user.name || '').split(' ').map((n: string) => n[0]).join('')}
                         </span>
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.nombre}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
+                        <div className="text-sm font-medium text-gray-900">{user.nombre || user.name || 'Sin nombre'}</div>
+                        <div className="text-sm text-gray-500">{user.email || ''}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role.nombre)}`}>
-                      {getRoleDisplayName(user.role.nombre)}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role?.nombre || '')}`}>
+                      {getRoleDisplayName(user.role?.nombre || '')}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

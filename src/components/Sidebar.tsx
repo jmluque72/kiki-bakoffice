@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
       )}
 
       {/* Sidebar */}
-      <div className={`fixed left-0 top-0 h-full w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
+      <nav data-testid="sidebar" className={`fixed left-0 top-0 h-full w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out z-50 ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } lg:translate-x-0 lg:static lg:z-0`}>
         
@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6">
+        <div className="flex-1 px-4 py-6">
           <ul className="space-y-2">
             {menuItems.map((item) => (
               <li key={item.key}>
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
               </li>
             ))}
           </ul>
-        </nav>
+        </div>
 
         {/* Logout */}
         <div className="p-4 border-t border-gray-200">
@@ -130,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
             <span className="font-medium">Cerrar Sesión</span>
           </button>
         </div>
-      </div>
+      </nav>
     </>
   );
 };

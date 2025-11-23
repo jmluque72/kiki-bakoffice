@@ -27,15 +27,14 @@ export class AuthService {
   static async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
       console.log('🔍 [AUTH SERVICE] Iniciando login con MongoDB...');
-      console.log('🔍 [AUTH SERVICE] Endpoint:', '/auth/cognito-login');
+      console.log('🔍 [AUTH SERVICE] Endpoint:', '/users/login');
       console.log('🔍 [AUTH SERVICE] Email:', credentials.email);
       console.log('🔍 [AUTH SERVICE] API Base URL:', apiClient.defaults.baseURL);
       
       // Usar endpoint de login para backoffice (MongoDB)
-      // NOTA: El endpoint se llama "cognito-login" por razones de compatibilidad histórica,
-      // pero ahora usa MongoDB, NO Cognito
+      // NOTA: Usamos /users/login que es el endpoint correcto para MongoDB (sin Cognito)
       const response = await apiClient.post<ApiResponse<LoginResponse>>(
-        '/auth/cognito-login', // Endpoint de login para backoffice usando MongoDB
+        '/users/login', // Endpoint de login para backoffice usando MongoDB
         credentials
       );
       
