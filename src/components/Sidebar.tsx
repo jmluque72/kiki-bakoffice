@@ -19,7 +19,8 @@ import {
   Bell,
   Shield,
   FolderOpen,
-  ClipboardList
+  ClipboardList,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -52,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
         { icon: Activity, label: 'Activity', key: 'activity' },
         { icon: Calendar, label: 'Eventos', key: 'eventos' },
         { icon: Bell, label: 'Notificaciones', key: 'notificaciones' },
+        { icon: Smartphone, label: 'Push Notifications', key: 'push-notifications' },
         { icon: Building2, label: 'Divisiones', key: 'divisiones' },
         { icon: UserPlus, label: 'Tutores', key: 'tutores' },
         { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },

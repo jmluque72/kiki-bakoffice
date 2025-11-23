@@ -17,6 +17,7 @@ import TutoresSection from './sections/TutoresSection';
 import { DocumentsSection } from './sections/DocumentsSection';
 import { StudentActionsSection } from './sections/StudentActionsSection';
 import { FormulariosSection } from './sections/FormulariosSection';
+import { PushNotificationsSection } from './sections/PushNotificationsSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -83,6 +84,8 @@ export const Dashboard: React.FC = () => {
         return <FormulariosSection isReadonly={isSuperAdmin} />;
       case 'documentos':
         return <DocumentsSection isReadonly={isSuperAdmin} />;
+      case 'push-notifications':
+        return <PushNotificationsSection isReadonly={isSuperAdmin} />;
       case 'dashboard':
       default:
         return <DashboardContent />;
