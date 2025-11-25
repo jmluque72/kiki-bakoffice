@@ -159,14 +159,19 @@ export const FormResponsesView: React.FC<FormResponsesViewProps> = ({
         formRequest.preguntas.forEach((pregunta, index) => {
           const respuesta = response.respuestas.find(r => r.preguntaId === pregunta._id);
           let respuestaTexto = 'Sin respuesta';
-          if (respuesta) {
+          if (respuesta && respuesta.valor !== null && respuesta.valor !== undefined && respuesta.valor !== '') {
             if (Array.isArray(respuesta.valor)) {
               respuestaTexto = respuesta.valor.join(', ');
-            } else if (pregunta.tipo === 'imagen' || pregunta.tipo === 'archivo') {
-              // Para imágenes y archivos, incluir la URL completa
-              respuestaTexto = `https://kiki-bucket-app.s3.amazonaws.com/${respuesta.valor}`;
             } else {
-              respuestaTexto = respuesta.valor;
+              const valorStr = String(respuesta.valor);
+              if (pregunta.tipo === 'imagen' || pregunta.tipo === 'archivo') {
+                // Si ya es una URL completa, usarla; si no, construirla
+                respuestaTexto = valorStr.startsWith('http://') || valorStr.startsWith('https://') 
+                  ? valorStr 
+                  : `https://kiki-bucket-app.s3.amazonaws.com/${valorStr}`;
+              } else {
+                respuestaTexto = valorStr;
+              }
             }
           }
           row[`Pregunta ${index + 1}: ${pregunta.texto}`] = respuestaTexto;
@@ -408,9 +413,33 @@ export const FormResponsesView: React.FC<FormResponsesViewProps> = ({
                 <div className="space-y-4">
                   <h4 className="font-medium text-gray-900">Respuestas:</h4>
                   {formRequest.preguntas.map((pregunta, index) => {
+                    // Comparar IDs como strings para evitar problemas de tipo
+                    const preguntaIdStr = String(pregunta._id);
                     const respuesta = selectedResponse.respuestas.find(
-                      r => r.preguntaId === pregunta._id
+                      r => String(r.preguntaId) === preguntaIdStr
                     );
+                    
+                    // Debug: Log para todas las preguntas tipo imagen
+                    if (pregunta.tipo === 'imagen') {
+                      console.log(`[DEBUG IMAGEN] Pregunta ${index}: "${pregunta.texto}"`, {
+                        preguntaId: preguntaIdStr,
+                        tipo: pregunta.tipo,
+                        tieneRespuesta: !!respuesta,
+                        todasLasRespuestas: selectedResponse.respuestas.map(r => ({
+                          preguntaId: String(r.preguntaId),
+                          valor: r.valor,
+                          valorType: typeof r.valor
+                        })),
+                        respuestaEncontrada: respuesta ? {
+                          preguntaId: String(respuesta.preguntaId),
+                          valor: respuesta.valor,
+                          valorType: typeof respuesta.valor,
+                          valorLength: String(respuesta.valor).length,
+                          valorString: String(respuesta.valor)
+                        } : null
+                      });
+                    }
+                    
                     return (
                       <div key={index} className="border border-gray-200 rounded-md p-4">
                         <div className="mb-2">
@@ -419,39 +448,62 @@ export const FormResponsesView: React.FC<FormResponsesViewProps> = ({
                           <span className="ml-2 text-xs text-gray-500 capitalize">({pregunta.tipo})</span>
                         </div>
                         <div className="text-sm text-gray-700">
-                          {respuesta ? (
+                          {respuesta && respuesta.valor !== null && respuesta.valor !== undefined && String(respuesta.valor).trim() !== '' ? (
                             Array.isArray(respuesta.valor) ? (
                               <ul className="list-disc list-inside">
                                 {respuesta.valor.map((v, i) => (
                                   <li key={i}>{v}</li>
                                 ))}
                               </ul>
-                            ) : pregunta.tipo === 'imagen' ? (
+                            ) : pregunta.tipo === 'imagen' || pregunta.tipo === 'archivo' ? (
                               <div className="mt-2">
-                                <img 
-                                  src={`https://kiki-bucket-app.s3.amazonaws.com/${respuesta.valor}`}
-                                  alt="Imagen de respuesta"
-                                  className="max-w-xs max-h-48 rounded-md border border-gray-200"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                                <p className="text-xs text-gray-500 mt-1">{respuesta.valor}</p>
-                              </div>
-                            ) : pregunta.tipo === 'archivo' ? (
-                              <div className="mt-2">
-                                <a
-                                  href={`https://kiki-bucket-app.s3.amazonaws.com/${respuesta.valor}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-800 underline"
-                                >
-                                  📄 Ver archivo
-                                </a>
-                                <p className="text-xs text-gray-500 mt-1">{respuesta.valor}</p>
+                                {(() => {
+                                  // Determinar si el valor es una URL completa o solo una key
+                                  const valorStr = String(respuesta.valor);
+                                  const imageUrl = valorStr.startsWith('http://') || valorStr.startsWith('https://') 
+                                    ? valorStr 
+                                    : `https://kiki-bucket-app.s3.amazonaws.com/${valorStr}`;
+                                  
+                                  return pregunta.tipo === 'imagen' ? (
+                                    <>
+                                      <img 
+                                        src={imageUrl}
+                                        alt="Imagen de respuesta"
+                                        className="max-w-xs max-h-48 rounded-md border border-gray-200"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.style.display = 'none';
+                                          // Mostrar el valor como texto si la imagen falla
+                                          const errorText = target.nextElementSibling as HTMLElement;
+                                          if (errorText) {
+                                            errorText.style.display = 'block';
+                                          }
+                                        }}
+                                      />
+                                      <p className="text-xs text-gray-500 mt-1" style={{ display: 'none' }}>{valorStr}</p>
+                                      <p className="text-xs text-blue-600 mt-1">
+                                        <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                                          Ver imagen
+                                        </a>
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <div className="mt-2">
+                                      <a
+                                        href={imageUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-800 underline"
+                                      >
+                                        📄 Ver archivo
+                                      </a>
+                                      <p className="text-xs text-gray-500 mt-1">{valorStr}</p>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             ) : (
-                              <p>{respuesta.valor}</p>
+                              <p>{String(respuesta.valor)}</p>
                             )
                           ) : (
                             <p className="text-gray-400 italic">Sin respuesta</p>

@@ -2,7 +2,7 @@ import { apiClient } from '../config/api';
 
 export interface FormQuestion {
   _id?: string;
-  tipo: 'texto' | 'opcion_multiple' | 'checkbox' | 'imagen' | 'archivo';
+  tipo: 'texto' | 'opcion_multiple' | 'checkbox' | 'imagen';
   texto: string;
   requerido: boolean;
   opciones?: string[];

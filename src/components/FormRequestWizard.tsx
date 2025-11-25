@@ -299,7 +299,7 @@ export const FormRequestWizard: React.FC<FormRequestWizardProps> = ({ form, onCl
             <select
               value={pregunta.tipo}
               onChange={(e) => {
-                const newTipo = e.target.value as 'texto' | 'opcion_multiple' | 'checkbox' | 'imagen' | 'archivo';
+                const newTipo = e.target.value as 'texto' | 'opcion_multiple' | 'checkbox' | 'imagen';
                 
                 // Actualizar el tipo y las opciones en una sola operación
                 const newPreguntas = [...preguntas];
@@ -320,7 +320,6 @@ export const FormRequestWizard: React.FC<FormRequestWizardProps> = ({ form, onCl
               <option value="opcion_multiple">Opción Múltiple</option>
               <option value="checkbox">Checkbox (Múltiples opciones)</option>
               <option value="imagen">Imagen</option>
-              <option value="archivo">Archivo</option>
             </select>
           </div>
 

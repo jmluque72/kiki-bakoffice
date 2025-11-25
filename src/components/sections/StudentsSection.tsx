@@ -280,6 +280,7 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
     }
 
     setUploading(true);
+    setUploadResults(null);
     const formData = new FormData();
     formData.append('excel', uploadFile);
     formData.append('accountId', currentAccount._id);
@@ -293,18 +294,59 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
         }
       });
 
-      if (response.data.success) {
-        setUploadResults(response.data.data);
-        Notification.success(response.data.message);
-        setShowUploadModal(false);
-        setUploadFile(null);
-        setShowPreview(false);
-        setPreviewData([]);
-        loadStudents();
+      const result = response.data;
+      const data = result.data || result;
+
+      // Guardar resultados para mostrar
+      setUploadResults(data);
+
+      // Verificar si hay éxitos o errores
+      const successCount = data.success || 0;
+      const errorCount = data.errors?.length || 0;
+      const totalCount = data.total || 0;
+
+      if (successCount > 0) {
+        // Hay éxitos, mostrar mensaje de éxito
+        if (errorCount > 0) {
+          Notification.warning(`${result.message || `Carga completada: ${successCount} alumnos cargados, ${errorCount} errores`}`);
+        } else {
+          Notification.success(result.message || `Carga completada: ${successCount} alumnos cargados exitosamente`);
+          // Si todo salió bien, cerrar el modal y recargar
+          setShowUploadModal(false);
+          setUploadFile(null);
+          setShowPreview(false);
+          setPreviewData([]);
+          loadStudents();
+        }
+      } else if (errorCount > 0) {
+        // Solo hay errores
+        Notification.error(result.message || `No se pudieron cargar alumnos. ${errorCount} errores encontrados`);
+      } else {
+        // No hay datos
+        Notification.warning('No se encontraron datos para procesar');
       }
     } catch (error: any) {
       console.error('Error subiendo archivo:', error);
-      Notification.error(error.response?.data?.message || 'Error al subir el archivo');
+      
+      // Intentar extraer datos de la respuesta aunque sea un error HTTP
+      const errorResponse = error.response?.data;
+      if (errorResponse?.data) {
+        // El backend devolvió datos aunque sea status 400
+        const data = errorResponse.data;
+        setUploadResults(data);
+        
+        const successCount = data.success || 0;
+        const errorCount = data.errors?.length || 0;
+        
+        if (successCount > 0) {
+          Notification.warning(errorResponse.message || `Carga completada con advertencias: ${successCount} alumnos cargados, ${errorCount} errores`);
+        } else {
+          Notification.error(errorResponse.message || `No se pudieron cargar alumnos. ${errorCount} errores encontrados`);
+        }
+      } else {
+        // Error real de red o servidor
+        Notification.error(errorResponse?.message || 'Error al subir el archivo');
+      }
     } finally {
       setUploading(false);
     }
@@ -778,19 +820,23 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => {
-                    setShowUploadModal(false);
-                    setShowPreview(false);
-                    setPreviewData([]);
-                    setUploadFile(null);
+                    if (!uploading) {
+                      setShowUploadModal(false);
+                      setShowPreview(false);
+                      setPreviewData([]);
+                      setUploadFile(null);
+                      setUploadResults(null);
+                    }
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  disabled={uploading}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleFileUpload}
                   disabled={!uploadFile || uploading}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploading ? 'Subiendo...' : 'Subir'}
                 </button>
@@ -803,38 +849,57 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
       {/* Modal de resultados */}
       {uploadResults && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-5 border w-[600px] shadow-lg rounded-md bg-white max-h-[80vh] overflow-y-auto">
             <div className="mt-3">
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Resultados de la carga
               </h3>
               
               <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                  <p className="text-sm text-green-800">
-                    <strong>{uploadResults.success}</strong> alumnos cargados exitosamente
-                  </p>
-                </div>
-                
-                {uploadResults.errors.length > 0 && (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                    <p className="text-sm text-red-800 mb-2">
-                      <strong>{uploadResults.errors.length}</strong> errores encontrados:
+                {uploadResults.success > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                    <p className="text-sm text-green-800">
+                      <strong>{uploadResults.success}</strong> de <strong>{uploadResults.total || uploadResults.success}</strong> alumnos cargados exitosamente
                     </p>
-                    <div className="max-h-32 overflow-y-auto">
+                  </div>
+                )}
+                
+                {uploadResults.errors && uploadResults.errors.length > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                    <p className="text-sm text-red-800 mb-2 font-medium">
+                      <strong>{uploadResults.errors.length}</strong> error(es) encontrado(s):
+                    </p>
+                    <div className="max-h-60 overflow-y-auto space-y-1">
                       {uploadResults.errors.map((error: any, index: number) => (
-                        <p key={index} className="text-xs text-red-700">
-                          Fila {error.row}: {error.error}
+                        <p key={index} className="text-xs text-red-700 bg-red-100 p-2 rounded">
+                          <span className="font-medium">Fila {error.row}:</span> {error.error}
                         </p>
                       ))}
                     </div>
+                  </div>
+                )}
+                
+                {uploadResults.success === 0 && (!uploadResults.errors || uploadResults.errors.length === 0) && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                    <p className="text-sm text-yellow-800">
+                      No se procesaron filas. Verifica que el archivo tenga el formato correcto.
+                    </p>
                   </div>
                 )}
               </div>
               
               <div className="flex justify-end mt-6">
                 <button
-                  onClick={() => setUploadResults(null)}
+                  onClick={() => {
+                    setUploadResults(null);
+                    if (uploadResults.success > 0 && (!uploadResults.errors || uploadResults.errors.length === 0)) {
+                      // Si todo salió bien, cerrar también el modal de upload
+                      setShowUploadModal(false);
+                      setUploadFile(null);
+                      setShowPreview(false);
+                      setPreviewData([]);
+                    }
+                  }}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700"
                 >
                   Cerrar
@@ -842,8 +907,8 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
               </div>
             </div>
           </div>
-                 </div>
-       )}
+        </div>
+      )}
 
        {/* Confirmation Dialog */}
        <ConfirmationDialog
