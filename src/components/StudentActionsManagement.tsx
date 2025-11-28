@@ -19,6 +19,7 @@ interface StudentAction {
   color: string;
   orden: number;
   activo: boolean;
+  valores?: string[]; // Valores posibles que puede tomar la acción (texto)
   createdAt: string;
   updatedAt: string;
 }
@@ -31,6 +32,7 @@ interface StudentActionForm {
   color: string;
   orden: number;
   activo: boolean;
+  valores?: string[]; // Valores posibles que puede tomar la acción (texto)
 }
 
 const StudentActionsManagement: React.FC = () => {
@@ -67,8 +69,14 @@ const StudentActionsManagement: React.FC = () => {
     categoria: '',
     color: '#0E5FCE',
     orden: 0,
-    activo: true
+    activo: true,
+    valores: undefined
   });
+  
+  // Estado para manejar los valores como string (para el input)
+  const [valoresInput, setValoresInput] = useState<string>('');
+  // Estado para manejar valores individuales (para agregar uno por uno)
+  const [nuevoValor, setNuevoValor] = useState<string>('');
 
   // Validación
   const [errors, setErrors] = useState<Partial<Record<keyof StudentActionForm, string>>>({});
@@ -134,13 +142,19 @@ const StudentActionsManagement: React.FC = () => {
       categoria: 'otro', // Valor por defecto, no se muestra en el formulario
       color: '#0E5FCE',
       orden: 0,
-      activo: true
+      activo: true,
+      valores: undefined
     });
+    setValoresInput('');
+    setNuevoValor('');
     setErrors({});
     setShowCreateModal(true);
   };
 
   const handleEdit = (action: StudentAction) => {
+    console.log('📝 [FRONTEND] Editando acción:', action);
+    console.log('📝 [FRONTEND] Valores de la acción:', action.valores);
+    
     setFormData({
       nombre: action.nombre,
       descripcion: action.descripcion || '',
@@ -148,8 +162,19 @@ const StudentActionsManagement: React.FC = () => {
       categoria: action.categoria,
       color: action.color,
       orden: action.orden,
-      activo: action.activo
+      activo: action.activo,
+      valores: action.valores
     });
+    
+    // Convertir array de valores a string para el input
+    const valoresString = action.valores && Array.isArray(action.valores) && action.valores.length > 0
+      ? action.valores.join(', ')
+      : '';
+    
+    console.log('📝 [FRONTEND] Valores convertidos a string:', valoresString);
+    
+    setValoresInput(valoresString);
+    setNuevoValor('');
     setErrors({});
     setEditingAction(action);
     setShowEditModal(true);
@@ -184,18 +209,57 @@ const StudentActionsManagement: React.FC = () => {
       return;
     }
     
-    try {
-      if (editingAction) {
-        await updateAction(editingAction._id, formData);
-      } else {
-        await createAction(formData);
+    // Procesar valores: convertir string a array de strings (texto)
+    let valoresArray: string[] | undefined = undefined;
+    if (valoresInput.trim()) {
+      try {
+        valoresArray = valoresInput
+          .split(',')
+          .map(v => v.trim())
+          .filter(v => v.length > 0);
+        
+        if (valoresArray.length === 0) {
+          valoresArray = undefined;
+        } else {
+          // Eliminar duplicados (mantener orden)
+          valoresArray = [...new Set(valoresArray)];
+        }
+      } catch (error: any) {
+        setErrors({ ...errors, valores: error.message || 'Formato inválido. Usa texto separado por comas (ej: "1 vez", "2 veces", "3 veces")' });
+        return;
       }
+    }
+    
+    // Si no hay valores, enviar null explícitamente para limpiar el campo
+    const dataToSave = {
+      ...formData,
+      valores: valoresArray && valoresArray.length > 0 ? valoresArray : null
+    };
+    
+    console.log('💾 [FRONTEND] Datos a guardar:', dataToSave);
+    console.log('💾 [FRONTEND] Valores array:', valoresArray);
+    
+    try {
+      let savedAction;
+      if (editingAction) {
+        savedAction = await updateAction(editingAction._id, dataToSave);
+        console.log('✅ [FRONTEND] Acción actualizada:', savedAction);
+      } else {
+        savedAction = await createAction(dataToSave);
+        console.log('✅ [FRONTEND] Acción creada:', savedAction);
+      }
+      
+      // Recargar acciones después de guardar
+      await loadActions();
+      
       setShowCreateModal(false);
       setShowEditModal(false);
       setEditingAction(null);
       setErrors({});
+      setValoresInput('');
+      setNuevoValor('');
     } catch (error) {
-      console.error('Error saving action:', error);
+      console.error('❌ [FRONTEND] Error saving action:', error);
     }
   };
 
@@ -364,6 +428,9 @@ const StudentActionsManagement: React.FC = () => {
                   Orden
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Valores
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -401,6 +468,11 @@ const StudentActionsManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {action.orden}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {action.valores && action.valores.length > 0 
+                      ? action.valores.join(', ') 
+                      : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Badge className={action.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
@@ -565,6 +637,107 @@ const StudentActionsManagement: React.FC = () => {
                   min="0"
                 />
               </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="valores">Valores Posibles (opcional)</Label>
+              
+              {/* Método 1: Input de texto con múltiples valores separados por comas */}
+              <Input
+                id="valores"
+                value={valoresInput}
+                onChange={(e) => {
+                  setValoresInput(e.target.value);
+                  if (errors.valores) {
+                    setErrors({ ...errors, valores: undefined });
+                  }
+                }}
+                placeholder='Ej: "1 vez", "2 veces", "3 veces" (texto separado por comas)'
+                className={errors.valores ? 'border-red-500 focus-visible:ring-red-500 mb-2' : 'mb-2'}
+              />
+              
+              {/* Método 2: Agregar valores uno por uno */}
+              <div className="flex gap-2 mb-2">
+                <Input
+                  type="text"
+                  value={nuevoValor}
+                  onChange={(e) => setNuevoValor(e.target.value)}
+                  placeholder='Agregar valor (ej: "1 vez")'
+                  className="flex-1"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const valorTexto = nuevoValor.trim();
+                      if (valorTexto.length > 0) {
+                        const valoresActuales = valoresInput.trim() 
+                          ? valoresInput.split(',').map(v => v.trim()).filter(v => v)
+                          : [];
+                        const nuevosValores = [...valoresActuales, valorTexto];
+                        const valoresUnicos = [...new Set(nuevosValores)];
+                        setValoresInput(valoresUnicos.join(', '));
+                        setNuevoValor('');
+                        if (errors.valores) {
+                          setErrors({ ...errors, valores: undefined });
+                        }
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const valorTexto = nuevoValor.trim();
+                    if (valorTexto.length > 0) {
+                      const valoresActuales = valoresInput.trim() 
+                        ? valoresInput.split(',').map(v => v.trim()).filter(v => v)
+                        : [];
+                      const nuevosValores = [...valoresActuales, valorTexto];
+                      const valoresUnicos = [...new Set(nuevosValores)];
+                      setValoresInput(valoresUnicos.join(', '));
+                      setNuevoValor('');
+                      if (errors.valores) {
+                        setErrors({ ...errors, valores: undefined });
+                      }
+                    }
+                  }}
+                  disabled={!nuevoValor || nuevoValor.trim().length === 0}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              {/* Mostrar valores actuales como badges */}
+              {valoresInput.trim() && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {valoresInput.split(',').map(v => v.trim()).filter(v => v).map((valor, index) => (
+                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                      {valor}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const valoresActuales = valoresInput.split(',').map(v => v.trim()).filter(v => v);
+                          valoresActuales.splice(index, 1);
+                          setValoresInput(valoresActuales.join(', '));
+                          if (errors.valores) {
+                            setErrors({ ...errors, valores: undefined });
+                          }
+                        }}
+                        className="ml-1 hover:text-red-600"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              
+              <p className="text-xs text-gray-500 mt-1">
+                Define los valores que puede tomar esta acción. Puedes escribirlos separados por comas o agregarlos uno por uno. Por ejemplo, para "hizo caca" puedes definir: "1 vez", "2 veces", "3 veces", "4 veces", "5 veces"
+              </p>
+              {errors.valores && (
+                <p className="text-xs text-red-500 mt-1">{errors.valores}</p>
+              )}
             </div>
             
             <div className="flex items-center space-x-2">

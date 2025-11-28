@@ -42,19 +42,6 @@ export const StudentActionsDayModal: React.FC<StudentActionsDayModalProps> = ({
     });
   };
 
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      alimentacion: 'Alimentación',
-      higiene: 'Higiene',
-      descanso: 'Descanso',
-      juego: 'Juego',
-      aprendizaje: 'Aprendizaje',
-      social: 'Social',
-      otro: 'Otro'
-    };
-    return labels[category] || category;
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
@@ -100,15 +87,17 @@ export const StudentActionsDayModal: React.FC<StudentActionsDayModalProps> = ({
                         <h3 className="font-semibold text-lg text-gray-900">
                           {action.accion.nombre}
                         </h3>
-                        <span
-                          className="px-2 py-1 text-xs font-medium rounded-full"
-                          style={{
-                            backgroundColor: `${action.accion.color}20`,
-                            color: action.accion.color
-                          }}
-                        >
-                          {getCategoryLabel(action.accion.categoria)}
-                        </span>
+                        {action.valor && (
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-full"
+                            style={{
+                              backgroundColor: `${action.accion.color}20`,
+                              color: action.accion.color
+                            }}
+                          >
+                            {action.valor}
+                          </span>
+                        )}
                       </div>
                       
                       <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">

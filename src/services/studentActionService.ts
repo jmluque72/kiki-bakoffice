@@ -17,6 +17,7 @@ export interface StudentAction {
   color: string;
   activo: boolean;
   orden: number;
+  valores?: string[]; // Valores posibles que puede tomar la acción (ej: ["1 vez", "2 veces", "3 veces"] para "hizo caca")
   creadoPor: {
     _id: string;
     name: string;
@@ -34,6 +35,7 @@ export interface CreateStudentActionRequest {
   icono?: string;
   color?: string;
   orden?: number;
+  valores?: number[]; // Valores posibles que puede tomar la acción
 }
 
 export interface UpdateStudentActionRequest {
@@ -44,6 +46,7 @@ export interface UpdateStudentActionRequest {
   color?: string;
   orden?: number;
   activo?: boolean;
+  valores?: number[]; // Valores posibles que puede tomar la acción
 }
 
 export interface StudentActionLog {
@@ -70,6 +73,7 @@ export interface StudentActionLog {
   comentarios?: string;
   imagenes: string[];
   estado: 'registrado' | 'confirmado' | 'rechazado';
+  valor?: string;
   createdAt: string;
   updatedAt: string;
 }
