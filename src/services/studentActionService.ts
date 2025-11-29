@@ -12,7 +12,7 @@ export interface StudentAction {
     _id: string;
     nombre: string;
   };
-  categoria: 'alimentacion' | 'sueño' | 'higiene' | 'juego' | 'aprendizaje' | 'social' | 'otro';
+  categoria: 'comida' | 'bano' | 'dormir' | 'salud' | 'emociones' | 'otros';
   icono: string;
   color: string;
   activo: boolean;
@@ -31,7 +31,7 @@ export interface CreateStudentActionRequest {
   nombre: string;
   descripcion?: string;
   division: string;
-  categoria: 'alimentacion' | 'sueño' | 'higiene' | 'juego' | 'aprendizaje' | 'social' | 'otro';
+  categoria: 'comida' | 'bano' | 'dormir' | 'salud' | 'emociones' | 'otros';
   icono?: string;
   color?: string;
   orden?: number;
@@ -41,7 +41,7 @@ export interface CreateStudentActionRequest {
 export interface UpdateStudentActionRequest {
   nombre?: string;
   descripcion?: string;
-  categoria?: 'alimentacion' | 'sueño' | 'higiene' | 'juego' | 'aprendizaje' | 'social' | 'otro';
+  categoria?: 'comida' | 'baño' | 'dormir' | 'salud' | 'emociones';
   icono?: string;
   color?: string;
   orden?: number;

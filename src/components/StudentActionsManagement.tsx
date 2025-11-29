@@ -66,7 +66,7 @@ const StudentActionsManagement: React.FC = () => {
     nombre: '',
     descripcion: '',
     division: '',
-    categoria: '',
+    categoria: 'comida', // Valor por defecto
     color: '#0E5FCE',
     orden: 0,
     activo: true,
@@ -111,22 +111,24 @@ const StudentActionsManagement: React.FC = () => {
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      alimentacion: 'Alimentación',
-      higiene: 'Higiene',
-      descanso: 'Descanso',
-      juego: 'Juego',
-      otro: 'Otro'
+      comida: 'Comida',
+      bano: 'Baño',
+      dormir: 'Dormir',
+      salud: 'Salud',
+      emociones: 'Emociones',
+      otros: 'Otros'
     };
     return labels[category] || category;
   };
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-      alimentacion: 'bg-blue-100 text-blue-800',
-      higiene: 'bg-purple-100 text-purple-800',
-      descanso: 'bg-green-100 text-green-800',
-      juego: 'bg-orange-100 text-orange-800',
-      otro: 'bg-gray-100 text-gray-800'
+      comida: 'bg-orange-100 text-orange-800',
+      bano: 'bg-blue-100 text-blue-800',
+      dormir: 'bg-purple-100 text-purple-800',
+      salud: 'bg-red-100 text-red-800',
+      emociones: 'bg-pink-100 text-pink-800',
+      otros: 'bg-gray-100 text-gray-800'
     };
     return colors[category] || 'bg-gray-100 text-gray-800';
   };
@@ -139,7 +141,7 @@ const StudentActionsManagement: React.FC = () => {
       nombre: '',
       descripcion: '',
       division: selectedDivisionForManagement, // Pre-llenar con la división seleccionada
-      categoria: 'otro', // Valor por defecto, no se muestra en el formulario
+      categoria: 'comida', // Valor por defecto
       color: '#0E5FCE',
       orden: 0,
       activo: true,
@@ -194,6 +196,10 @@ const StudentActionsManagement: React.FC = () => {
     
     if (!formData.division) {
       newErrors.division = 'La división es obligatoria';
+    }
+    
+    if (!formData.categoria) {
+      newErrors.categoria = 'La categoría es obligatoria';
     }
     
     if (!formData.color || !formData.color.match(/^#[0-9A-Fa-f]{6}$/)) {
@@ -376,11 +382,12 @@ const StudentActionsManagement: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas las categorías</SelectItem>
-                <SelectItem value="alimentacion">Alimentación</SelectItem>
-                <SelectItem value="higiene">Higiene</SelectItem>
-                <SelectItem value="descanso">Descanso</SelectItem>
-                <SelectItem value="juego">Juego</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
+                <SelectItem value="comida">Comida</SelectItem>
+                <SelectItem value="bano">Baño</SelectItem>
+                <SelectItem value="dormir">Dormir</SelectItem>
+                <SelectItem value="salud">Salud</SelectItem>
+                <SelectItem value="emociones">Emociones</SelectItem>
+                <SelectItem value="otros">Otros</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -591,6 +598,34 @@ const StudentActionsManagement: React.FC = () => {
               )}
               {errors.division && (
                 <p className="text-xs text-red-500 mt-1">{errors.division}</p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="categoria">Categoría *</Label>
+              <Select 
+                value={formData.categoria || 'comida'} 
+                onValueChange={(value) => {
+                  setFormData({ ...formData, categoria: value as 'comida' | 'bano' | 'dormir' | 'salud' | 'emociones' | 'otros' });
+                  if (errors.categoria) {
+                    setErrors({ ...errors, categoria: undefined });
+                  }
+                }}
+              >
+                <SelectTrigger id="categoria" className={errors.categoria ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Seleccionar categoría" />
+                </SelectTrigger>
+                <SelectContent position="popper" className="z-[200]">
+                  <SelectItem value="comida">Comida</SelectItem>
+                  <SelectItem value="bano">Baño</SelectItem>
+                  <SelectItem value="dormir">Dormir</SelectItem>
+                  <SelectItem value="salud">Salud</SelectItem>
+                  <SelectItem value="emociones">Emociones</SelectItem>
+                  <SelectItem value="otros">Otros</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.categoria && (
+                <p className="text-xs text-red-500 mt-1">{errors.categoria}</p>
               )}
             </div>
             
