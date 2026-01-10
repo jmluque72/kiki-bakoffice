@@ -5,9 +5,10 @@ export interface Notification {
   title: string;
   message: string;
   type: 'informacion' | 'comunicacion' | 'institucion';
-  sender: {
+  sender?: {
     _id: string;
-    nombre: string;
+    name?: string;
+    nombre?: string;
     email: string;
   };
   account: {
@@ -18,16 +19,17 @@ export interface Notification {
     _id: string;
     nombre: string;
   };
-  recipients: Array<{
+  recipients?: Array<{
     _id: string;
     nombre: string;
-    email: string;
+    email?: string;
   }>;
+  recipientsCount?: number;
   readBy: Array<{
     user: string;
     readAt: string;
   }>;
-  status: 'sent' | 'delivered' | 'read';
+  status: 'pending' | 'sent' | 'delivered' | 'read' | 'rejected';
   priority: 'low' | 'medium' | 'high';
   sentAt: string;
   createdAt: string;
@@ -142,6 +144,23 @@ export class NotificationService {
     }
   }
 
+  // Obtener detalles de una notificación
+  static async getNotificationDetails(notificationId: string): Promise<Notification> {
+    try {
+      const response = await apiClient.get<ApiResponse<Notification>>(
+        `/api/notifications/${notificationId}/details`
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Error al obtener detalles de la notificación');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener detalles de la notificación');
+    }
+  }
+
   // Obtener destinatarios disponibles
   static async getRecipients(accountId: string, divisionId?: string): Promise<any[]> {
     try {
@@ -235,6 +254,107 @@ export class NotificationService {
       }
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Error al obtener datos del calendario');
+    }
+  }
+}
+
+// Interfaces para templates de notificaciones
+export interface NotificationTemplate {
+  _id: string;
+  nombre: string;
+  texto: string;
+  account: {
+    _id: string;
+    nombre: string;
+  };
+  creadoPor: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTemplateRequest {
+  nombre: string;
+  texto: string;
+  accountId: string;
+}
+
+export interface UpdateTemplateRequest {
+  nombre?: string;
+  texto?: string;
+  activo?: boolean;
+}
+
+export class NotificationTemplateService {
+  // Obtener templates de una institución
+  static async getTemplates(accountId: string): Promise<NotificationTemplate[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<NotificationTemplate[]>>(
+        `/api/notifications/templates?accountId=${accountId}`
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Error al obtener templates');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al obtener templates');
+    }
+  }
+
+  // Crear template
+  static async createTemplate(data: CreateTemplateRequest): Promise<NotificationTemplate> {
+    try {
+      const response = await apiClient.post<ApiResponse<NotificationTemplate>>(
+        '/api/notifications/templates',
+        data
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Error al crear template');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al crear template');
+    }
+  }
+
+  // Actualizar template
+  static async updateTemplate(templateId: string, data: UpdateTemplateRequest): Promise<NotificationTemplate> {
+    try {
+      const response = await apiClient.put<ApiResponse<NotificationTemplate>>(
+        `/api/notifications/templates/${templateId}`,
+        data
+      );
+      
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(response.data.message || 'Error al actualizar template');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al actualizar template');
+    }
+  }
+
+  // Eliminar template
+  static async deleteTemplate(templateId: string): Promise<void> {
+    try {
+      const response = await apiClient.delete<ApiResponse<void>>(
+        `/api/notifications/templates/${templateId}`
+      );
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Error al eliminar template');
+      }
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error al eliminar template');
     }
   }
 }

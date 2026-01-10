@@ -136,8 +136,10 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
       return;
     }
 
-    if (selectedStudents.length === 0) {
-      alert('Por favor selecciona al menos un estudiante');
+    // Permitir enviar sin seleccionar estudiantes si hay división seleccionada
+    // (se enviará a todos los estudiantes de la división)
+    if (selectedStudents.length === 0 && !selectedDivision) {
+      alert('Por favor selecciona una división o al menos un estudiante');
       return;
     }
 
@@ -460,7 +462,7 @@ export const SendNotificationModal: React.FC<SendNotificationModalProps> = ({
           </button>
           <button
             onClick={handleSendNotification}
-            disabled={loading || !title.trim() || !message.trim() || selectedStudents.length === 0 || title.length > 100 || message.length > 256}
+            disabled={loading || !title.trim() || !message.trim() || (!selectedDivision && selectedStudents.length === 0) || title.length > 100 || message.length > 256}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
           >
             {loading ? (

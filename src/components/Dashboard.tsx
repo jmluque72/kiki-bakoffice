@@ -7,6 +7,7 @@ import { UsuariosSection } from './sections/UsuariosSection';
 import { ActivitySection } from './sections/ActivitySection';
 import { EventosSection } from './sections/EventosSection';
 import { NotificationsSection } from './sections/NotificationsSection';
+import { PendingNotificationsSection } from './sections/PendingNotificationsSection';
 import PickupSection from './sections/PickupSection';
 
 import GruposSection from './sections/GruposSection';
@@ -18,6 +19,8 @@ import { DocumentsSection } from './sections/DocumentsSection';
 import { StudentActionsSection } from './sections/StudentActionsSection';
 import { FormulariosSection } from './sections/FormulariosSection';
 import { PushNotificationsSection } from './sections/PushNotificationsSection';
+import { LoginStatsSection } from './sections/LoginStatsSection';
+import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -62,6 +65,8 @@ export const Dashboard: React.FC = () => {
         return <EventosSection isReadonly={isSuperAdmin} />;
       case 'notificaciones':
         return <NotificationsSection isReadonly={isSuperAdmin} />;
+      case 'notificaciones-pendientes':
+        return <PendingNotificationsSection isReadonly={isSuperAdmin} />;
       case 'divisiones':
         return <GruposSection 
           userRole={user?.role?.nombre || ''} 
@@ -86,6 +91,10 @@ export const Dashboard: React.FC = () => {
         return <DocumentsSection isReadonly={isSuperAdmin} />;
       case 'push-notifications':
         return <PushNotificationsSection isReadonly={isSuperAdmin} />;
+      case 'login-stats':
+        return <LoginStatsSection />;
+      case 'notification-templates':
+        return <NotificationTemplatesSection isReadonly={isSuperAdmin} />;
       case 'dashboard':
       default:
         return <DashboardContent />;
@@ -105,7 +114,6 @@ export const Dashboard: React.FC = () => {
         <Header 
           onMenuClick={() => setSidebarOpen(true)} 
           currentSection={activeSection}
-          onNotificationClick={() => setActiveSection('notificaciones')}
         />
         <main className="flex-1 p-6">
           {renderContent()}

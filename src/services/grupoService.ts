@@ -10,6 +10,7 @@ export interface Grupo {
     razonSocial: string;
   };
   activo: boolean;
+  requiereAprobacionNotificaciones?: boolean;
   creadoPor: {
     _id: string;
     name: string;
@@ -36,6 +37,7 @@ export interface UpdateGrupoRequest {
   nombre?: string;
   descripcion?: string;
   activo?: boolean;
+  requiereAprobacionNotificaciones?: boolean;
 }
 
 class GrupoService {

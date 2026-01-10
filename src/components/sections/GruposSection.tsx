@@ -78,7 +78,8 @@ const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: Grupos
     nombre: '',
     descripcion: '',
     cuentaId: '',
-    activo: true
+    activo: true,
+    requiereAprobacionNotificaciones: false
   });
 
   const loadAccounts = useCallback(async () => {
@@ -112,7 +113,8 @@ const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: Grupos
         nombre: grupo.nombre,
         descripcion: grupo.descripcion || '',
         cuentaId: grupo.cuenta._id,
-        activo: grupo.activo
+        activo: grupo.activo,
+        requiereAprobacionNotificaciones: grupo.requiereAprobacionNotificaciones || false
       });
     } else {
       setEditingGrupo(null);
@@ -120,7 +122,8 @@ const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: Grupos
         nombre: '',
         descripcion: '',
         cuentaId: '',
-        activo: true
+        activo: true,
+        requiereAprobacionNotificaciones: false
       });
     }
     setOpenDialog(true);
@@ -133,7 +136,8 @@ const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: Grupos
       nombre: '',
       descripcion: '',
       cuentaId: '',
-      activo: true
+      activo: true,
+      requiereAprobacionNotificaciones: false
     });
   };
 
@@ -143,7 +147,8 @@ const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: Grupos
         const updateData: UpdateGrupoRequest = {
           nombre: formData.nombre,
           descripcion: formData.descripcion,
-          activo: formData.activo
+          activo: formData.activo,
+          requiereAprobacionNotificaciones: formData.requiereAprobacionNotificaciones
         };
         await grupoService.updateGrupo(editingGrupo._id, updateData);
       } else {
@@ -753,15 +758,31 @@ const GruposSection = ({ userRole, onSectionChange, isReadonly = false }: Grupos
             )}
 
             {editingGrupo && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={formData.activo}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, activo: e.target.checked })}
-                  />
-                }
-                label="Activo"
-              />
+              <>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.activo}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, activo: e.target.checked })}
+                    />
+                  }
+                  label="Activo"
+                />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={formData.requiereAprobacionNotificaciones}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, requiereAprobacionNotificaciones: e.target.checked })}
+                    />
+                  }
+                  label="Requiere aprobación de notificaciones"
+                />
+                {formData.requiereAprobacionNotificaciones && (
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    Cuando esta opción está activa, las notificaciones enviadas por coordinadores a los tutores quedarán en estado "pendiente" y deberán ser aprobadas por el administrador del colegio antes de ser enviadas a los padres.
+                  </Alert>
+                )}
+              </>
             )}
           </Box>
         </DialogContent>

@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Menu, Bell, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useNotificationCount } from '../hooks/useNotificationCount';
-import { ApiStatus } from './ApiStatus';
 import { getRoleDisplayName, getRoleColor } from '../utils/roleTranslations';
 import { ChangePasswordModal } from './ChangePasswordModal';
+import { AllNotificationsModal } from './AllNotificationsModal';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -17,6 +17,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection, onN
   const { unreadCount, shouldShowNotifications } = useNotificationCount();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Cerrar menú al hacer clic fuera
@@ -59,22 +60,18 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection, onN
         </div>
 
         <div className="flex items-center gap-4">
-          {shouldShowNotifications && (
-            <button 
-              onClick={onNotificationClick}
-              className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
-              title="Notificaciones"
-            >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs rounded-full flex items-center justify-center px-1">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </button>
-          )}
-          
-          <ApiStatus />
+          <button 
+            onClick={() => setShowAllNotifications(true)}
+            className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+            title="Ver todas las notificaciones"
+          >
+            <Bell className="w-5 h-5" />
+            {shouldShowNotifications && unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs rounded-full flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
           
           <div className="relative" ref={userMenuRef}>
             <button
@@ -122,6 +119,11 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection, onN
       <ChangePasswordModal
         isOpen={showChangePassword}
         onClose={() => setShowChangePassword(false)}
+      />
+      
+      <AllNotificationsModal
+        isOpen={showAllNotifications}
+        onClose={() => setShowAllNotifications(false)}
       />
     </header>
   );
