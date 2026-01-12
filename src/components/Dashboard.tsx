@@ -94,7 +94,8 @@ export const Dashboard: React.FC = () => {
       case 'login-stats':
         return <LoginStatsSection />;
       case 'notification-templates':
-        return <NotificationTemplatesSection isReadonly={isSuperAdmin} />;
+        // Solo adminaccount puede crear templates (según requerimiento)
+        return <NotificationTemplatesSection isReadonly={userRole !== 'adminaccount'} />;
       case 'dashboard':
       default:
         return <DashboardContent />;
