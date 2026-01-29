@@ -21,6 +21,7 @@ import { FormulariosSection } from './sections/FormulariosSection';
 import { PushNotificationsSection } from './sections/PushNotificationsSection';
 import { LoginStatsSection } from './sections/LoginStatsSection';
 import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection';
+import { AccountConfigSection } from './sections/AccountConfigSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -96,6 +97,9 @@ export const Dashboard: React.FC = () => {
       case 'notification-templates':
         // Solo adminaccount puede crear templates (según requerimiento)
         return <NotificationTemplatesSection isReadonly={userRole !== 'adminaccount'} />;
+      case 'account-config':
+        // Configuración de institución accesible para adminaccount
+        return <AccountConfigSection />;
       case 'dashboard':
       default:
         return <DashboardContent />;

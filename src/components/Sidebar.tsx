@@ -60,10 +60,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
         { icon: ClipboardList, label: 'Acciones Diarias', key: 'acciones-diarias' },
         { icon: Shield, label: 'Quién Retira', key: 'pickup' },
         { icon: FileText, label: 'Formularios', key: 'formularios' },
-        ...(user?.role?.nombre === 'adminaccount' || user?.role?.nombre === 'superadmin' ? [{ icon: Bell, label: 'Notificaciones Pendientes', key: 'notificaciones-pendientes' }] : []),
-        ...(user?.role?.nombre === 'adminaccount' || user?.role?.nombre === 'superadmin' ? [{ icon: FileText, label: 'Templates de Notificaciones', key: 'notification-templates' }] : []),
-        ...(user?.role?.nombre === 'adminaccount' ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }] : []),
-        ...(user?.role?.nombre === 'adminaccount' || user?.role?.nombre === 'superadmin' ? [{ icon: Activity, label: 'Estadísticas de Login', key: 'login-stats' }] : []),
+        ...(user?.role?.nombre === 'adminaccount'
+          ? [{ icon: Settings, label: 'Config. Institución', key: 'account-config' }]
+          : []),
+        ...(user?.role?.nombre === 'adminaccount' || user?.role?.nombre === 'superadmin'
+          ? [{ icon: Bell, label: 'Notificaciones Pendientes', key: 'notificaciones-pendientes' }]
+          : []),
+        ...(user?.role?.nombre === 'adminaccount' || user?.role?.nombre === 'superadmin'
+          ? [{ icon: FileText, label: 'Templates de Notificaciones', key: 'notification-templates' }]
+          : []),
+        ...(user?.role?.nombre === 'adminaccount'
+          ? [{ icon: FolderOpen, label: 'Documentos', key: 'documentos' }]
+          : []),
+        ...(user?.role?.nombre === 'adminaccount' || user?.role?.nombre === 'superadmin'
+          ? [{ icon: Activity, label: 'Estadísticas de Login', key: 'login-stats' }]
+          : []),
       ];
 
   const handleSectionClick = (sectionKey: string) => {

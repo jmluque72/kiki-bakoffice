@@ -142,6 +142,10 @@ export class AccountService {
     _id: string;
     account: string;
     requiereAprobarActividades: boolean;
+    quickNotificationSettings: {
+      code: string;
+      enabled: boolean;
+    }[];
     createdAt: string;
     updatedAt: string;
   }> {
@@ -151,12 +155,20 @@ export class AccountService {
           _id: string;
           account: string;
           requiereAprobarActividades: boolean;
+          quickNotificationSettings?: {
+            code: string;
+            enabled: boolean;
+          }[];
           createdAt: string;
           updatedAt: string;
         };
       }>>(`/api/accounts/${accountId}/config`);
       
-      return response.data.data!.config;
+      const cfg = response.data.data!.config;
+      return {
+        ...cfg,
+        quickNotificationSettings: cfg.quickNotificationSettings || []
+      };
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Error al obtener configuración');
     }
@@ -164,10 +176,18 @@ export class AccountService {
 
   static async updateAccountConfig(accountId: string, config: {
     requiereAprobarActividades: boolean;
+    quickNotificationSettings: {
+      code: string;
+      enabled: boolean;
+    }[];
   }): Promise<{
     _id: string;
     account: string;
     requiereAprobarActividades: boolean;
+    quickNotificationSettings: {
+      code: string;
+      enabled: boolean;
+    }[];
     createdAt: string;
     updatedAt: string;
   }> {
@@ -177,12 +197,20 @@ export class AccountService {
           _id: string;
           account: string;
           requiereAprobarActividades: boolean;
+          quickNotificationSettings?: {
+            code: string;
+            enabled: boolean;
+          }[];
           createdAt: string;
           updatedAt: string;
         };
       }>>(`/api/accounts/${accountId}/config`, config);
       
-      return response.data.data!.config;
+      const cfg = response.data.data!.config;
+      return {
+        ...cfg,
+        quickNotificationSettings: cfg.quickNotificationSettings || []
+      };
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Error al actualizar configuración');
     }
