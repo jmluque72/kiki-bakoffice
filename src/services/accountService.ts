@@ -215,4 +215,110 @@ export class AccountService {
       throw new Error(error.response?.data?.message || 'Error al actualizar configuración');
     }
   }
+
+  // Configuración de cobranzas (pagos)
+  static async getPaymentConfig(accountId: string): Promise<{
+    _id: string;
+    account: string;
+    matriculaAnual: { cobran: boolean; monto: number };
+    matriculaPorDivision: { division: string; monto: number }[];
+    cuotaPorDivision: { division: string; monto: number }[];
+    moneda: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }> {
+    const response = await apiClient.get<ApiResponse<{
+      config: {
+        _id: string;
+        account: string;
+        matriculaAnual: { cobran: boolean; monto: number };
+        matriculaPorDivision: { division: string; monto: number }[];
+        cuotaPorDivision: { division: string; monto: number }[];
+        moneda: string;
+        createdAt?: string;
+        updatedAt?: string;
+      };
+    }>>(`/api/accounts/${accountId}/payment-config`);
+    if (!response.data?.data?.config) throw new Error('Error al obtener configuración de cobranzas');
+    return response.data.data.config;
+  }
+
+  static async updatePaymentConfig(accountId: string, config: {
+    matriculaAnual: { cobran: boolean; monto: number };
+    matriculaPorDivision?: { division: string; monto: number }[];
+    cuotaPorDivision: { division: string; monto: number }[];
+    moneda?: string;
+  }): Promise<void> {
+    await apiClient.put(`/api/accounts/${accountId}/payment-config`, config);
+  }
+
+  // Registro de pagos (por mes, estudiante, división)
+  static async getPayments(accountId: string, params: {
+    year: number;
+    month: number; // 0 = matrícula anual
+    divisionId?: string;
+    studentId?: string;
+  }): Promise<{ payments: PaymentRow[]; moneda: string }> {
+    const search = new URLSearchParams();
+    search.set('year', String(params.year));
+    search.set('month', String(params.month));
+    if (params.divisionId) search.set('divisionId', params.divisionId);
+    if (params.studentId) search.set('studentId', params.studentId);
+    const response = await apiClient.get<ApiResponse<{ payments: PaymentRow[]; moneda: string }>>(
+      `/api/accounts/${accountId}/payments?${search.toString()}`
+    );
+    if (!response.data?.data) throw new Error('Error al obtener pagos');
+    return response.data.data;
+  }
+
+  static async upsertPayment(accountId: string, body: {
+    studentId: string;
+    divisionId: string;
+    year: number;
+    month: number;
+    amountPaid: number;
+    paidAt?: string;
+    notes?: string;
+    origen?: string;
+    referencia?: string;
+  }): Promise<void> {
+    await apiClient.post(`/api/accounts/${accountId}/payments`, body);
+  }
+
+  static async getPaymentStats(accountId: string, year?: number): Promise<PaymentStats> {
+    const params = year != null ? `?year=${year}` : '';
+    const response = await apiClient.get<ApiResponse<PaymentStats>>(
+      `/api/accounts/${accountId}/payment-stats${params}`
+    );
+    if (!response.data?.data) throw new Error('Error al obtener estadísticas de pagos');
+    return response.data.data;
+  }
+}
+
+export interface PaymentStats {
+  year: number;
+  moneda: string;
+  totalEsperado: number;
+  totalCobrado: number;
+  totalPendiente: number;
+  resumenEstado: { pagado: number; pendiente: number; parcial: number };
+  porMes: { month: number; esperado: number; cobrado: number; pendiente: number; cantidadPagados: number; cantidadPendientes: number }[];
+  matriculaEsperada?: number;
+}
+
+export type OrigenPago = 'efectivo' | 'tarjeta' | 'banco' | 'transferencia' | 'cheque' | 'otro';
+
+export interface PaymentRow {
+  student: { _id: string; nombre: string; apellido: string };
+  division: { _id: string; nombre: string } | null;
+  year: number;
+  month: number;
+  amountExpected: number;
+  amountPaid: number;
+  status: 'pendiente' | 'pagado' | 'parcial';
+  paidAt: string | null;
+  notes: string;
+  origen?: string | null;
+  referencia?: string;
+  paymentId: string | null;
 } 

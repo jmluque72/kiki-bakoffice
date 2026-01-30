@@ -22,6 +22,7 @@ import { PushNotificationsSection } from './sections/PushNotificationsSection';
 import { LoginStatsSection } from './sections/LoginStatsSection';
 import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection';
 import { AccountConfigSection } from './sections/AccountConfigSection';
+import { PaymentConfigSection } from './sections/PaymentConfigSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -98,8 +99,13 @@ export const Dashboard: React.FC = () => {
         // Solo adminaccount puede crear templates (según requerimiento)
         return <NotificationTemplatesSection isReadonly={userRole !== 'adminaccount'} />;
       case 'account-config':
-        // Configuración de institución accesible para adminaccount
         return <AccountConfigSection />;
+      case 'payment-config':
+        return <PaymentConfigSection view="config" onSectionChange={setActiveSection} />;
+      case 'payment-register':
+        return <PaymentConfigSection view="register" onSectionChange={setActiveSection} />;
+      case 'payment-stats':
+        return <PaymentConfigSection view="stats" onSectionChange={setActiveSection} />;
       case 'dashboard':
       default:
         return <DashboardContent />;
