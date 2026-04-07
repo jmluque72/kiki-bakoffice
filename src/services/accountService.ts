@@ -223,6 +223,7 @@ export class AccountService {
     matriculaAnual: { cobran: boolean; monto: number };
     matriculaPorDivision: { division: string; monto: number }[];
     cuotaPorDivision: { division: string; monto: number }[];
+    productos: { _id?: string; nombre: string; precio: number; activo?: boolean }[];
     moneda: string;
     createdAt?: string;
     updatedAt?: string;
@@ -234,6 +235,7 @@ export class AccountService {
         matriculaAnual: { cobran: boolean; monto: number };
         matriculaPorDivision: { division: string; monto: number }[];
         cuotaPorDivision: { division: string; monto: number }[];
+        productos: { _id?: string; nombre: string; precio: number; activo?: boolean }[];
         moneda: string;
         createdAt?: string;
         updatedAt?: string;
@@ -247,9 +249,14 @@ export class AccountService {
     matriculaAnual: { cobran: boolean; monto: number };
     matriculaPorDivision?: { division: string; monto: number }[];
     cuotaPorDivision: { division: string; monto: number }[];
+    productos?: { _id?: string; nombre: string; precio: number; activo?: boolean }[];
     moneda?: string;
   }): Promise<void> {
     await apiClient.put(`/api/accounts/${accountId}/payment-config`, config);
+  }
+
+  static async assignStudentPaymentProduct(accountId: string, studentId: string, productId: string | null): Promise<void> {
+    await apiClient.put(`/api/accounts/${accountId}/students/${studentId}/payment-product`, { productId });
   }
 
   // Registro de pagos (por mes, estudiante, división)
@@ -309,8 +316,10 @@ export interface PaymentStats {
 export type OrigenPago = 'efectivo' | 'tarjeta' | 'banco' | 'transferencia' | 'cheque' | 'otro';
 
 export interface PaymentRow {
-  student: { _id: string; nombre: string; apellido: string };
+  student: { _id: string; nombre: string; apellido: string; paymentProductId?: string | null };
   division: { _id: string; nombre: string } | null;
+  paymentProduct?: { _id: string; nombre: string; precio: number } | null;
+  pricingSource?: 'matricula' | 'producto' | 'division';
   year: number;
   month: number;
   amountExpected: number;

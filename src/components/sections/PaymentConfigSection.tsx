@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, CreditCard, ListChecks, PlusCircle, BarChart3, Clock, DollarSign } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Loader2, AlertCircle, CreditCard, ListChecks, PlusCircle, BarChart3, Clock, DollarSign, Download } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { AccountService, PaymentRow, PaymentStats, OrigenPago } from '../../services/accountService';
 import { grupoService, Grupo } from '../../services/grupoService';
@@ -29,6 +29,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
     matriculaAnual: { cobran: boolean; monto: number };
     matriculaPorDivision: { division: string; monto: number }[];
     cuotaPorDivision: { division: string; monto: number }[];
+    productos: { _id?: string; nombre: string; precio: number; activo?: boolean }[];
     moneda: string;
   } | null>(null);
 
@@ -46,6 +47,9 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
   const [modalOrigen, setModalOrigen] = useState<string>('');
   const [modalReferencia, setModalReferencia] = useState('');
   const [modalSaving, setModalSaving] = useState(false);
+  const [paymentsSearch, setPaymentsSearch] = useState('');
+  const [newProductName, setNewProductName] = useState('');
+  const [newProductPrice, setNewProductPrice] = useState('');
 
   const ORIGENES: { value: OrigenPago | ''; label: string }[] = [
     { value: '', label: '—' },
@@ -61,6 +65,17 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [statsYear, setStatsYear] = useState(new Date().getFullYear());
+
+  const filteredPayments = useMemo(() => {
+    if (!paymentsData?.payments) return [];
+    const term = paymentsSearch.trim().toLowerCase();
+    if (!term) return paymentsData.payments;
+    return paymentsData.payments.filter((row) => {
+      const studentFullName = `${row.student.apellido}, ${row.student.nombre}`.toLowerCase();
+      const divisionName = (row.division?.nombre || '').toLowerCase();
+      return studentFullName.includes(term) || divisionName.includes(term);
+    });
+  }, [paymentsData, paymentsSearch]);
 
   const accountId = user?.account?._id || '';
   const isAdminAccount = user?.role?.nombre === 'adminaccount';
@@ -88,6 +103,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
           matriculaAnual: paymentConfig.matriculaAnual || { cobran: false, monto: 0 },
           matriculaPorDivision: paymentConfig.matriculaPorDivision || [],
           cuotaPorDivision: paymentConfig.cuotaPorDivision || [],
+          productos: paymentConfig.productos || [],
           moneda: paymentConfig.moneda || 'ARS',
         });
       } catch (err: any) {
@@ -97,6 +113,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
           matriculaAnual: { cobran: false, monto: 0 },
           matriculaPorDivision: [],
           cuotaPorDivision: [],
+          productos: [],
           moneda: 'ARS',
         });
       } finally {
@@ -182,6 +199,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
         matriculaAnual: config.matriculaAnual,
         matriculaPorDivision: config.matriculaPorDivision,
         cuotaPorDivision: config.cuotaPorDivision,
+        productos: config.productos || [],
         moneda: config.moneda,
       });
       setSuccessMessage('Configuración de cobranzas guardada correctamente.');
@@ -195,7 +213,10 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
 
   const openPaymentModal = (row: PaymentRow) => {
     setModalRow(row);
-    setModalAmountPaid(String(row.amountPaid || ''));
+    const yaRegistrado = (row.amountPaid || 0) > 0 || !!row.paymentId;
+    setModalAmountPaid(
+      yaRegistrado ? String(row.amountPaid ?? '') : String(row.amountExpected ?? 0)
+    );
     setModalPaidAt(row.paidAt ? row.paidAt.slice(0, 10) : new Date().toISOString().slice(0, 10));
     setModalNotes(row.notes || '');
     setModalOrigen(row.origen || '');
@@ -204,6 +225,30 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
 
   const closePaymentModal = () => {
     setModalRow(null);
+  };
+
+  const addProduct = () => {
+    if (!config) return;
+    const nombre = newProductName.trim();
+    const precio = Math.max(0, parseFloat(newProductPrice) || 0);
+    if (!nombre) {
+      setError('El producto debe tener nombre.');
+      return;
+    }
+    setConfig((prev) => prev ? {
+      ...prev,
+      productos: [...(prev.productos || []), { nombre, precio, activo: true }]
+    } : prev);
+    setNewProductName('');
+    setNewProductPrice('');
+    setError(null);
+  };
+
+  const removeProduct = (index: number) => {
+    setConfig((prev) => prev ? {
+      ...prev,
+      productos: (prev.productos || []).filter((_, i) => i !== index)
+    } : prev);
   };
 
   const handleSubmitPayment = async () => {
@@ -237,6 +282,41 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
     } finally {
       setModalSaving(false);
     }
+  };
+
+  const handleExportDebtCsv = () => {
+    if (!paymentsData) return;
+    const debtRows = filteredPayments.filter((row) => row.amountExpected > row.amountPaid);
+    if (debtRows.length === 0) {
+      setPaymentsError('No hay deudas para exportar con los filtros actuales.');
+      return;
+    }
+    const headers = ['Alumno', 'Division', 'Periodo', 'Monto esperado', 'Monto pagado', 'Deuda'];
+    const csvRows = debtRows.map((row) => {
+      const period = row.month === 0 ? `Matricula ${row.year}` : `${String(row.month).padStart(2, '0')}/${row.year}`;
+      const debt = (row.amountExpected - row.amountPaid).toFixed(2);
+      return [
+        `${row.student.apellido}, ${row.student.nombre}`,
+        row.division?.nombre || '-',
+        period,
+        row.amountExpected.toFixed(2),
+        row.amountPaid.toFixed(2),
+        debt
+      ];
+    });
+    const csv = [headers, ...csvRows]
+      .map((line) => line.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const filePeriod = filterMonth === 0 ? `matricula-${filterYear}` : `${String(filterMonth).padStart(2, '0')}-${filterYear}`;
+    link.href = url;
+    link.download = `deudas-${filePeriod}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (!isAdminAccount && !isSuperAdmin) {
@@ -501,6 +581,73 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
               </div>
             </div>
 
+            {/* Productos vendibles */}
+            <div className="pt-4 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Productos vendibles</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Si un alumno tiene pack asignado (en <strong>Alumnos</strong>), su precio mensual reemplaza a la cuota de la división.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                <input
+                  type="text"
+                  value={newProductName}
+                  onChange={(e) => setNewProductName(e.target.value)}
+                  placeholder="Nombre del producto (ej: Pack 8 horas)"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[260px]"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={newProductPrice}
+                  onChange={(e) => setNewProductPrice(e.target.value)}
+                  placeholder="Precio"
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-32"
+                />
+                <button
+                  type="button"
+                  onClick={addProduct}
+                  className="px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800"
+                >
+                  Agregar
+                </button>
+              </div>
+              <div className="border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Producto</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Precio</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(config.productos || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-3 py-4 text-gray-500 text-center">No hay productos cargados.</td>
+                      </tr>
+                    ) : (
+                      (config.productos || []).map((prod, idx) => (
+                        <tr key={prod._id || `${prod.nombre}-${idx}`} className="border-t border-gray-100">
+                          <td className="px-3 py-2 font-medium text-gray-900">{prod.nombre}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{config.moneda} {Number(prod.precio || 0).toLocaleString()}</td>
+                          <td className="px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => removeProduct(idx)}
+                              className="text-red-600 hover:text-red-700 text-sm font-medium"
+                            >
+                              Quitar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <div className="pt-4">
               <button
                 type="button"
@@ -529,6 +676,9 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
               {paymentsSuccess}
             </div>
           )}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+            <strong>Registro de pagos:</strong> El <strong>plan/pack</strong> de cada alumno se asigna en la sección <strong>Alumnos</strong>; acá solo se registra lo cobrado. El monto esperado de la fila y del modal sale de ese plan o, si no tiene pack, del precio de la división. Para matrícula anual elegí <strong>&quot;Matrícula (anual)&quot;</strong> en Mes; para cuotas, el mes correspondiente.
+          </div>
           <div className="flex flex-wrap gap-4 mb-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Año</label>
@@ -543,17 +693,38 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Mes</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Mes / tipo</label>
               <select
                 value={filterMonth}
                 onChange={(e) => setFilterMonth(parseInt(e.target.value, 10))}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[180px]"
               >
-                <option value={0}>Matrícula (anual)</option>
+                <option value={0}>📋 Matrícula (anual)</option>
+                <option disabled>——— Cuotas mensuales ———</option>
                 {MESES.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Buscar alumno</label>
+              <input
+                type="text"
+                value={paymentsSearch}
+                onChange={(e) => setPaymentsSearch(e.target.value)}
+                placeholder="Apellido o nombre"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[220px]"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={handleExportDebtCsv}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Download className="w-4 h-4" />
+                Exportar deudas
+              </button>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">División</label>
@@ -575,12 +746,19 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
               <span className="ml-2 text-sm text-gray-600">Cargando pagos...</span>
             </div>
           ) : paymentsData ? (
-            <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[60vh] overflow-y-auto">
+            <div className="space-y-3">
+              {filterMonth === 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                  <strong>Pagos de matrícula {filterYear}.</strong> Registrá el monto cobrado por cada estudiante. El esperado sale de la configuración por división.
+                </div>
+              )}
+              <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-[60vh] overflow-y-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Estudiante</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">División</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Producto asignado</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-600">{filterMonth === 0 ? 'Matrícula esperada' : 'Cuota esperada'}</th>
                     <th className="px-3 py-2 text-right font-medium text-gray-600">Monto pagado</th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">Estado</th>
@@ -591,21 +769,29 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
                   </tr>
                 </thead>
                 <tbody>
-                  {paymentsData.payments.length === 0 ? (
+                  {filteredPayments.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-3 py-4 text-gray-500 text-center">
+                      <td colSpan={10} className="px-3 py-4 text-gray-500 text-center">
                         No hay estudiantes para el período y filtros seleccionados.
                       </td>
                     </tr>
                   ) : (
-                    paymentsData.payments.map((row) => (
+                    filteredPayments.map((row) => (
                       <tr key={`${row.student._id}-${row.division?._id}-${row.year}-${row.month}`} className="border-t border-gray-100">
                         <td className="px-3 py-2 font-medium text-gray-900">
                           {row.student.apellido}, {row.student.nombre}
                         </td>
                         <td className="px-3 py-2 text-gray-700">{row.division?.nombre || '-'}</td>
+                        <td className="px-3 py-2 text-gray-700">
+                          {row.paymentProduct?.nombre || 'Sin producto'}
+                        </td>
                         <td className="px-3 py-2 text-right text-gray-700">
                           {paymentsData.moneda} {row.amountExpected.toLocaleString()}
+                          {filterMonth !== 0 && (
+                            <span className="block text-[11px] text-gray-500">
+                              {row.pricingSource === 'producto' ? 'precio de producto' : 'precio de división'}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right text-gray-700">
                           {paymentsData.moneda} {row.amountPaid.toLocaleString()}
@@ -639,6 +825,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           ) : null}
         </div>
@@ -755,9 +942,26 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
             <p className="text-sm text-gray-600 mb-4">
               {modalRow.student.apellido}, {modalRow.student.nombre} – {modalRow.division?.nombre} – {filterMonth === 0 ? `Matrícula ${filterYear}` : `${filterMonth}/${filterYear}`}
             </p>
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-medium">Lo que corresponde pagar en este período</p>
+              <p className="mt-1">
+                <span className="text-blue-800/80">Monto esperado:</span>{' '}
+                <strong>{paymentsData?.moneda} {modalRow.amountExpected.toLocaleString()}</strong>
+                {filterMonth !== 0 && (
+                  <span className="block text-xs text-blue-800/80 mt-0.5">
+                    {modalRow.pricingSource === 'producto'
+                      ? `Plan: ${modalRow.paymentProduct?.nombre || 'pack asignado'}`
+                      : 'Tarifa de la división (sin pack en el alumno)'}
+                  </span>
+                )}
+              </p>
+              <p className="mt-2 text-xs text-blue-800/80">
+                El plan se define en <strong>Alumnos</strong> (columna &quot;Plan de cobranza&quot;). Si cambiás el plan ahí, volvé a esta pantalla para ver el monto actualizado.
+              </p>
+            </div>
             <div className="space-y-3 mb-6">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Monto pagado</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Monto pagado (total acumulado del período)</label>
                 <input
                   type="number"
                   min={0}

@@ -8,6 +8,7 @@ import { getRoleDisplayName } from '../../utils/roleTranslations';
 import QRCode from 'qrcode';
 import { useReactToPrint } from 'react-to-print';
 import { useAuth } from '../../hooks/useAuth';
+import { AccountService } from '../../services/accountService';
 import '../../styles/print.css';
 
 interface Student {
@@ -18,6 +19,7 @@ interface Student {
   dni: string;
   year: number;
   qrCode?: string;
+  paymentProductId?: string | null;
   account: {
     _id: string;
     nombre: string;
@@ -53,19 +55,26 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
   const [currentDivision, setCurrentDivision] = useState(selectedDivision);
 
   useEffect(() => {
-    if (!selectedAccount || !selectedDivision) {
-      const storedAccount = localStorage.getItem('selectedAccountForStudents');
-      const storedDivision = localStorage.getItem('selectedDivisionForStudents');
-      
-      if (storedAccount && storedDivision) {
+    if (selectedAccount) {
+      setCurrentAccount(selectedAccount);
+      setCurrentDivision(selectedDivision ?? null);
+      return;
+    }
+    const storedAccount = localStorage.getItem('selectedAccountForStudents');
+    const storedDivision = localStorage.getItem('selectedDivisionForStudents');
+    if (storedAccount && storedDivision) {
+      try {
         setCurrentAccount(JSON.parse(storedAccount));
         setCurrentDivision(JSON.parse(storedDivision));
+      } catch {
+        /* ignore corrupt storage */
       }
-    } else {
-      setCurrentAccount(selectedAccount);
-      setCurrentDivision(selectedDivision);
+      return;
     }
-  }, [selectedAccount, selectedDivision]);
+    if (user?.account?._id) {
+      setCurrentAccount(user.account);
+    }
+  }, [selectedAccount, selectedDivision, user]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -92,30 +101,37 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
   const [generatingQR, setGeneratingQR] = useState(false);
   const [qrCodeImage, setQrCodeImage] = useState<string>('');
   const [generatingQRImage, setGeneratingQRImage] = useState(false);
+
+  const [paymentProducts, setPaymentProducts] = useState<{ _id?: string; nombre: string; precio: number }[]>([]);
+  const [paymentMoneda, setPaymentMoneda] = useState('ARS');
+  const [assigningPlanStudentId, setAssigningPlanStudentId] = useState<string | null>(null);
   
   // Referencia para la impresión
   const printRef = useRef<HTMLDivElement>(null);
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
 
-  // Obtener cuenta del usuario si es adminaccount
+  // Si el contexto no trae account, el API devuelve { success, data: { account, ... } } (no "associations" en la raíz)
   useEffect(() => {
-    if (!isSuperAdmin && !currentAccount && user) {
-      const loadUserAccount = async () => {
-        try {
-          const response = await apiClient.get(`/api/users/profile`);
-          const userData = response.data;
-          if (userData.associations && userData.associations.length > 0) {
-            const account = userData.associations[0].account;
-            setCurrentAccount(account);
-          }
-        } catch (error) {
-          console.error('Error cargando cuenta del usuario:', error);
+    if (isSuperAdmin || currentAccount?._id || !user) return;
+
+    const loadUserAccount = async () => {
+      try {
+        const response = await apiClient.get(`/api/users/profile`);
+        const body = response.data as { success?: boolean; data?: any } & Record<string, any>;
+        const profile = body?.success && body?.data ? body.data : body;
+        const account =
+          profile?.account ||
+          (Array.isArray(profile?.associations) && profile.associations[0]?.account);
+        if (account?._id) {
+          setCurrentAccount(account);
         }
-      };
-      loadUserAccount();
-    }
-  }, [isSuperAdmin, currentAccount, user]);
+      } catch (error) {
+        console.error('Error cargando cuenta del usuario:', error);
+      }
+    };
+    loadUserAccount();
+  }, [isSuperAdmin, currentAccount?._id, user]);
 
   // Cargar alumnos
   const loadStudents = async () => {
@@ -468,6 +484,45 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
     loadStudents();
   }, [currentAccount]);
 
+  useEffect(() => {
+    const loadPaymentProducts = async () => {
+      if (!currentAccount?._id) {
+        setPaymentProducts([]);
+        return;
+      }
+      try {
+        const cfg = await AccountService.getPaymentConfig(currentAccount._id);
+        setPaymentProducts(cfg.productos || []);
+        setPaymentMoneda(cfg.moneda || 'ARS');
+      } catch {
+        setPaymentProducts([]);
+      }
+    };
+    loadPaymentProducts();
+  }, [currentAccount?._id]);
+
+  const handleStudentPlanChange = async (student: Student, productId: string) => {
+    if (!currentAccount?._id || isReadonly) return;
+    setAssigningPlanStudentId(student._id);
+    try {
+      await AccountService.assignStudentPaymentProduct(
+        currentAccount._id,
+        student._id,
+        productId || null
+      );
+      setStudents((prev) =>
+        prev.map((s) =>
+          s._id === student._id ? { ...s, paymentProductId: productId || null } : s
+        )
+      );
+      Notification.success('Plan de cobranza actualizado');
+    } catch (err: any) {
+      Notification.error(err?.message || 'No se pudo guardar el plan');
+    } finally {
+      setAssigningPlanStudentId(null);
+    }
+  };
+
   const handleExportStudents = () => {
     if (students.length === 0) {
       Notification.error('No hay alumnos para exportar');
@@ -646,6 +701,9 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                     División
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Plan de cobranza
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Año
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -674,6 +732,35 @@ export const StudentsSection: React.FC<StudentsSectionProps> = ({
                       <div className="text-sm text-gray-900">
                         {student.division?.nombre || 'N/A'}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap min-w-[200px]">
+                      {isReadonly ? (
+                        <div className="text-sm text-gray-600">
+                          {student.paymentProductId
+                            ? (paymentProducts.find(
+                                (p) => String(p._id) === String(student.paymentProductId)
+                              )?.nombre || 'Plan asignado')
+                            : 'Precio por división'}
+                        </div>
+                      ) : paymentProducts.length === 0 ? (
+                        <span className="text-xs text-amber-700">
+                          Creá productos en Cobranzas → Configuración
+                        </span>
+                      ) : (
+                        <select
+                          value={student.paymentProductId || ''}
+                          onChange={(e) => handleStudentPlanChange(student, e.target.value)}
+                          disabled={assigningPlanStudentId === student._id}
+                          className="border border-gray-300 rounded-md px-2 py-1.5 text-sm max-w-[220px]"
+                        >
+                          <option value="">Sin pack (usa precio de la sala)</option>
+                          {paymentProducts.map((p, idx) => (
+                            <option key={p._id || `${p.nombre}-${idx}`} value={p._id || ''}>
+                              {p.nombre} ({paymentMoneda} {Number(p.precio || 0).toLocaleString()})
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{student.year}</div>

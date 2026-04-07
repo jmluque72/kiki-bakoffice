@@ -2,12 +2,12 @@
 export const config = {
   // API - Detectar automáticamente el entorno
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 
-    (import.meta.env.DEV ? 'http://localhost:3000' : 'https://api.kiki.com.ar'),
+    (import.meta.env.DEV ? 'http://192.168.200.153:3000' : 'https://api.kiki.com.ar'),
   
   // Debug: Mostrar qué URL se está usando
   getApiUrl: () => {
     const url = import.meta.env.VITE_API_BASE_URL || 
-      (import.meta.env.DEV ? 'http://localhost:3000' : 'https://api.kiki.com.ar');
+      (import.meta.env.DEV ? 'http://192.168.200.153:3000' : 'https://api.kiki.com.ar');
     console.log('🔗 API URL configurada:', url);
     return url;
   },

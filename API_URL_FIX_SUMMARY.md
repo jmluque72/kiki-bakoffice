@@ -81,7 +81,7 @@ El backoffice tenía múltiples archivos que usaban URLs hardcodeadas (`localhos
 ### **Variables de Entorno**
 ```bash
 # .env
-#VITE_API_URL=http://192.168.68.104:3000
+#VITE_API_URL=http://192.168.200.153:3000
 # o para producción:
 VITE_API_URL=https://api.kiki.com.ar
 ```
