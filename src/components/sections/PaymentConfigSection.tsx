@@ -48,6 +48,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
   const [modalReferencia, setModalReferencia] = useState('');
   const [modalSaving, setModalSaving] = useState(false);
   const [paymentsSearch, setPaymentsSearch] = useState('');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState<'all' | 'pendiente' | 'pagado' | 'parcial'>('all');
   const [newProductName, setNewProductName] = useState('');
   const [newProductPrice, setNewProductPrice] = useState('');
 
@@ -65,17 +66,66 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
   const [statsYear, setStatsYear] = useState(new Date().getFullYear());
+  const [statsRange, setStatsRange] = useState<'year' | 'current_month' | 'three_months'>('year');
+  const statsPeriodLabel =
+    statsRange === 'year'
+      ? String(statsYear)
+      : (statsData?.periodLabel || (statsRange === 'current_month' ? 'Mes actual' : 'Últimos 3 meses'));
 
   const filteredPayments = useMemo(() => {
     if (!paymentsData?.payments) return [];
     const term = paymentsSearch.trim().toLowerCase();
-    if (!term) return paymentsData.payments;
     return paymentsData.payments.filter((row) => {
+      if (filterPaymentStatus !== 'all' && row.status !== filterPaymentStatus) return false;
+      if (!term) return true;
       const studentFullName = `${row.student.apellido}, ${row.student.nombre}`.toLowerCase();
       const divisionName = (row.division?.nombre || '').toLowerCase();
       return studentFullName.includes(term) || divisionName.includes(term);
     });
-  }, [paymentsData, paymentsSearch]);
+  }, [paymentsData, paymentsSearch, filterPaymentStatus]);
+
+  const displayedStats = useMemo(() => {
+    if (!statsData) return null;
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    const selectedMonthKeys = new Set<string>();
+    if (statsRange === 'year') {
+      for (let m = 1; m <= 12; m += 1) selectedMonthKeys.add(`${statsYear}-${m}`);
+    } else if (statsRange === 'current_month') {
+      selectedMonthKeys.add(`${currentYear}-${currentMonth}`);
+    } else {
+      for (let delta = 0; delta >= -2; delta -= 1) {
+        const d = new Date(currentYear, currentMonth - 1 + delta, 1);
+        selectedMonthKeys.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
+      }
+    }
+
+    const rows = (statsData.porMes || []).filter((row) => {
+      const y = row.year ?? statsData.year;
+      return selectedMonthKeys.has(`${y}-${row.month}`);
+    });
+
+    const totalEsperado = rows.reduce((acc, row) => acc + (Number(row.esperado) || 0), 0);
+    const totalCobrado = rows.reduce((acc, row) => acc + (Number(row.cobrado) || 0), 0);
+    const totalPendiente = rows.reduce((acc, row) => acc + (Number(row.pendiente) || 0), 0);
+    const resumenEstado = {
+      pagado: rows.reduce((acc, row) => acc + (Number(row.cantidadPagados) || 0), 0),
+      parcial: statsData.resumenEstado?.parcial || 0,
+      pendiente: rows.reduce((acc, row) => acc + (Number(row.cantidadPendientes) || 0), 0)
+    };
+
+    return {
+      ...statsData,
+      totalEsperado,
+      totalCobrado,
+      totalPendiente,
+      resumenEstado,
+      porMes: rows
+    };
+  }, [statsData, statsRange, statsYear]);
 
   const accountId = user?.account?._id || '';
   const isAdminAccount = user?.role?.nombre === 'adminaccount';
@@ -151,7 +201,10 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const data = await AccountService.getPaymentStats(accountId, statsYear);
+        const data = await AccountService.getPaymentStats(accountId, {
+          year: statsYear,
+          range: statsRange
+        });
         setStatsData(data);
       } catch (err: any) {
         setStatsError(err.message || 'Error al cargar estadísticas');
@@ -161,7 +214,7 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
       }
     };
     load();
-  }, [activeTab, accountId, statsYear]);
+  }, [activeTab, accountId, statsYear, statsRange]);
 
   const getMontoForDivision = (divisionId: string): number => {
     if (!config) return 0;
@@ -315,7 +368,54 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
     link.download = `deudas-${filePeriod}.csv`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportStatsCsv = () => {
+    if (!displayedStats) return;
+    if (!displayedStats.porMes || displayedStats.porMes.length === 0) {
+      setStatsError('No hay estadísticas para exportar con el período seleccionado.');
+      return;
+    }
+
+    const periodo = statsPeriodLabel;
+    const headersSummary = ['Periodo', 'Total cobrado', 'Total pendiente', 'Total esperado'];
+    const summaryRow = [
+      periodo,
+      displayedStats.totalCobrado.toFixed(2),
+      displayedStats.totalPendiente.toFixed(2),
+      displayedStats.totalEsperado.toFixed(2)
+    ];
+
+    const headersDetail = ['Mes', 'Esperado', 'Cobrado', 'Pendiente', 'Pagados', 'Pendientes'];
+    const detailRows = displayedStats.porMes.map((row) => {
+      const monthName = MESES.find((m) => m.value === row.month)?.label || String(row.month);
+      const year = row.year ?? displayedStats.year;
+      const monthLabel = statsRange === 'year' && year === displayedStats.year ? monthName : `${monthName} ${year}`;
+      return [
+        monthLabel,
+        row.esperado.toFixed(2),
+        row.cobrado.toFixed(2),
+        row.pendiente.toFixed(2),
+        String(row.cantidadPagados),
+        String(row.cantidadPendientes)
+      ];
+    });
+
+    const csv = [headersSummary, summaryRow, [], headersDetail, ...detailRows]
+      .map((line) => line.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safePeriod = periodo.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    link.href = url;
+    link.download = `estadisticas-pagos-${safePeriod || 'periodo'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
     URL.revokeObjectURL(url);
   };
 
@@ -679,6 +779,16 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
             <strong>Registro de pagos:</strong> El <strong>plan/pack</strong> de cada alumno se asigna en la sección <strong>Alumnos</strong>; acá solo se registra lo cobrado. El monto esperado de la fila y del modal sale de ese plan o, si no tiene pack, del precio de la división. Para matrícula anual elegí <strong>&quot;Matrícula (anual)&quot;</strong> en Mes; para cuotas, el mes correspondiente.
           </div>
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={handleExportDebtCsv}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <Download className="w-4 h-4" />
+              Exportar deudas
+            </button>
+          </div>
           <div className="flex flex-wrap gap-4 mb-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Año</label>
@@ -716,15 +826,18 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[220px]"
               />
             </div>
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={handleExportDebtCsv}
-                className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Estado</label>
+              <select
+                value={filterPaymentStatus}
+                onChange={(e) => setFilterPaymentStatus(e.target.value as 'all' | 'pendiente' | 'pagado' | 'parcial')}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[180px]"
               >
-                <Download className="w-4 h-4" />
-                Exportar deudas
-              </button>
+                <option value="all">Todos</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="pagado">Pagado</option>
+                <option value="parcial">Parcial</option>
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">División</label>
@@ -839,70 +952,132 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
               <span className="text-sm text-red-700">{statsError}</span>
             </div>
           )}
-          <div className="flex items-center gap-4 mb-6">
-            <label className="text-sm font-medium text-gray-600">Año:</label>
-            <select
-              value={statsYear}
-              onChange={(e) => setStatsYear(parseInt(e.target.value, 10))}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              {[new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+          <div className="flex flex-wrap items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-600">Período:</label>
+              <select
+                value={statsRange}
+                onChange={(e) => setStatsRange(e.target.value as 'year' | 'current_month' | 'three_months')}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[200px]"
+              >
+                <option value="year">Todo el año</option>
+                <option value="current_month">Mes actual</option>
+                <option value="three_months">Últimos 3 meses</option>
+              </select>
+            </div>
+            {statsRange === 'year' && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-600">Año:</label>
+                <select
+                  value={statsYear}
+                  onChange={(e) => setStatsYear(parseInt(e.target.value, 10))}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  {[new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={handleExportStatsCsv}
+                disabled={!displayedStats || displayedStats.porMes.length === 0}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-4 h-4" />
+                Exportar estadísticas
+              </button>
+            </div>
           </div>
           {statsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
               <span className="ml-2 text-sm text-gray-600">Cargando estadísticas...</span>
             </div>
-          ) : statsData ? (
+          ) : displayedStats ? (
             <div className="space-y-6">
+              {displayedStats.billingStart && (
+                <p className="text-xs text-gray-500 -mt-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  Deuda y montos esperados se calculan desde el alta de la institución ({MESES.find((m) => m.value === displayedStats.billingStart!.month)?.label || displayedStats.billingStart.month} {displayedStats.billingStart.year}); meses anteriores en el mismo año no suman.
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 text-green-700 mb-1">
                     <DollarSign className="w-5 h-5" />
-                    <span className="text-sm font-medium">Total cobrado ({statsData.year})</span>
+                    <span className="text-sm font-medium">
+                      Total cobrado
+                      {` (${statsPeriodLabel})`}
+                    </span>
                   </div>
                   <p className="text-2xl font-bold text-green-800">
-                    {statsData.moneda} {statsData.totalCobrado.toLocaleString()}
+                    {displayedStats.moneda} {displayedStats.totalCobrado.toLocaleString()}
                   </p>
+                  <div className="mt-2 space-y-1">
+                    {(displayedStats.resumenOrigen?.length ?? 0) > 0 ? (
+                      displayedStats.resumenOrigen!.slice(0, 3).map((item) => {
+                        const origenLabel = item.origen === 'sin_origen'
+                          ? 'Sin origen'
+                          : ORIGENES.find((o) => o.value === item.origen)?.label || item.origen;
+                        const percentage = displayedStats.totalCobrado > 0
+                          ? Math.round((item.totalCobrado / displayedStats.totalCobrado) * 100)
+                          : 0;
+                        return (
+                          <p key={`card-origen-${item.origen}`} className="text-xs text-green-900/80">
+                            {origenLabel}: <strong>{percentage}%</strong> ({displayedStats.moneda} {item.totalCobrado.toLocaleString()})
+                          </p>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-green-900/70">Sin desglose por origen.</p>
+                    )}
+                  </div>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 text-amber-700 mb-1">
                     <Clock className="w-5 h-5" />
-                    <span className="text-sm font-medium">Pendiente en el año</span>
+                    <span className="text-sm font-medium">
+                      {statsRange === 'year' ? 'Pendiente en el año' : 'Pendiente en el período'}
+                    </span>
                   </div>
                   <p className="text-2xl font-bold text-amber-800">
-                    {statsData.moneda} {statsData.totalPendiente.toLocaleString()}
+                    {displayedStats.moneda} {displayedStats.totalPendiente.toLocaleString()}
                   </p>
                 </div>
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 text-gray-700 mb-1">
                     <BarChart3 className="w-5 h-5" />
-                    <span className="text-sm font-medium">Esperado ({statsData.year})</span>
+                    <span className="text-sm font-medium">
+                      Esperado
+                      {` (${statsPeriodLabel})`}
+                    </span>
                   </div>
                   <p className="text-2xl font-bold text-gray-800">
-                    {statsData.moneda} {statsData.totalEsperado.toLocaleString()}
+                    {displayedStats.moneda} {displayedStats.totalEsperado.toLocaleString()}
                   </p>
-                  {(statsData.matriculaEsperada ?? 0) > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">incl. matrícula {statsData.moneda} {(statsData.matriculaEsperada ?? 0).toLocaleString()}</p>
+                  {statsRange === 'year' && (displayedStats.matriculaEsperada ?? 0) > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">incl. matrícula {displayedStats.moneda} {(displayedStats.matriculaEsperada ?? 0).toLocaleString()}</p>
                   )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-4 p-3 bg-gray-50 rounded-lg">
                 <span className="text-sm text-gray-600">
-                  <strong className="text-green-700">{statsData.resumenEstado.pagado}</strong> pagados
+                  <strong className="text-green-700">{displayedStats.resumenEstado.pagado}</strong> pagados
                 </span>
                 <span className="text-sm text-gray-600">
-                  <strong className="text-amber-700">{statsData.resumenEstado.parcial}</strong> parciales
+                  <strong className="text-amber-700">{displayedStats.resumenEstado.parcial}</strong> parciales
                 </span>
                 <span className="text-sm text-gray-600">
-                  <strong className="text-gray-700">{statsData.resumenEstado.pendiente}</strong> pendientes
+                  <strong className="text-gray-700">{displayedStats.resumenEstado.pendiente}</strong> pendientes
                 </span>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Por mes ({statsData.year})</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                  Por mes
+                  {` (${statsPeriodLabel})`}
+                </h3>
                 <div className="overflow-x-auto border border-gray-200 rounded-lg max-h-80 overflow-y-auto">
                   <table className="min-w-full text-sm">
                     <thead className="bg-gray-50 sticky top-0">
@@ -916,16 +1091,24 @@ export const PaymentConfigSection: React.FC<PaymentConfigSectionProps> = ({ view
                       </tr>
                     </thead>
                     <tbody>
-                      {statsData.porMes.map((row) => (
-                        <tr key={row.month} className="border-t border-gray-100">
-                          <td className="px-3 py-2 font-medium text-gray-900">{MESES.find((m) => m.value === row.month)?.label || row.month}</td>
-                          <td className="px-3 py-2 text-right text-gray-700">{statsData.moneda} {row.esperado.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right text-green-700">{statsData.moneda} {row.cobrado.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right text-amber-700">{statsData.moneda} {row.pendiente.toLocaleString()}</td>
+                      {displayedStats.porMes.map((row) => {
+                        const mesNombre = MESES.find((m) => m.value === row.month)?.label || String(row.month);
+                        const y = row.year ?? displayedStats.year;
+                        const mesCell =
+                          statsRange === 'year' && y === displayedStats.year
+                            ? mesNombre
+                            : `${mesNombre} ${y}`;
+                        return (
+                        <tr key={`${row.year ?? ''}-${row.month}`} className="border-t border-gray-100">
+                          <td className="px-3 py-2 font-medium text-gray-900">{mesCell}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{displayedStats.moneda} {row.esperado.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-green-700">{displayedStats.moneda} {row.cobrado.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right text-amber-700">{displayedStats.moneda} {row.pendiente.toLocaleString()}</td>
                           <td className="px-3 py-2 text-center text-gray-700">{row.cantidadPagados}</td>
                           <td className="px-3 py-2 text-center text-gray-700">{row.cantidadPendientes}</td>
                         </tr>
-                      ))}
+                      );
+                      })}
                     </tbody>
                   </table>
                 </div>

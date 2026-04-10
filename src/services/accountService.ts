@@ -265,13 +265,13 @@ export class AccountService {
     month: number; // 0 = matrícula anual
     divisionId?: string;
     studentId?: string;
-  }): Promise<{ payments: PaymentRow[]; moneda: string }> {
+  }): Promise<{ payments: PaymentRow[]; moneda: string; billingStart?: { year: number; month: number } }> {
     const search = new URLSearchParams();
     search.set('year', String(params.year));
     search.set('month', String(params.month));
     if (params.divisionId) search.set('divisionId', params.divisionId);
     if (params.studentId) search.set('studentId', params.studentId);
-    const response = await apiClient.get<ApiResponse<{ payments: PaymentRow[]; moneda: string }>>(
+    const response = await apiClient.get<ApiResponse<{ payments: PaymentRow[]; moneda: string; billingStart?: { year: number; month: number } }>>(
       `/api/accounts/${accountId}/payments?${search.toString()}`
     );
     if (!response.data?.data) throw new Error('Error al obtener pagos');
@@ -292,11 +292,23 @@ export class AccountService {
     await apiClient.post(`/api/accounts/${accountId}/payments`, body);
   }
 
-  static async getPaymentStats(accountId: string, year?: number): Promise<PaymentStats> {
-    const params = year != null ? `?year=${year}` : '';
-    const response = await apiClient.get<ApiResponse<PaymentStats>>(
-      `/api/accounts/${accountId}/payment-stats${params}`
-    );
+  static async getPaymentStats(
+    accountId: string,
+    opts?: { year?: number; range?: 'year' | 'current_month' | 'three_months' }
+  ): Promise<PaymentStats> {
+    const search = new URLSearchParams();
+    if (opts?.range === 'current_month' || opts?.range === 'three_months') {
+      search.set('range', opts.range);
+    } else {
+      const y = opts?.year ?? new Date().getFullYear();
+      search.set('year', String(y));
+    }
+    const q = search.toString();
+    const path =
+      q.length > 0
+        ? `/api/accounts/${accountId}/payment-stats?${q}`
+        : `/api/accounts/${accountId}/payment-stats`;
+    const response = await apiClient.get<ApiResponse<PaymentStats>>(path);
     if (!response.data?.data) throw new Error('Error al obtener estadísticas de pagos');
     return response.data.data;
   }
@@ -304,13 +316,28 @@ export class AccountService {
 
 export interface PaymentStats {
   year: number;
+  /** Modo de período; si no viene del API, se asume año completo. */
+  range?: 'year' | 'current_month' | 'three_months';
+  /** Etiqueta legible del rango (ej. últimos 3 meses). */
+  periodLabel?: string | null;
   moneda: string;
   totalEsperado: number;
   totalCobrado: number;
   totalPendiente: number;
   resumenEstado: { pagado: number; pendiente: number; parcial: number };
-  porMes: { month: number; esperado: number; cobrado: number; pendiente: number; cantidadPagados: number; cantidadPendientes: number }[];
+  resumenOrigen?: { origen: string; cantidad: number; totalCobrado: number }[];
+  porMes: {
+    year?: number;
+    month: number;
+    esperado: number;
+    cobrado: number;
+    pendiente: number;
+    cantidadPagados: number;
+    cantidadPendientes: number;
+  }[];
   matriculaEsperada?: number;
+  /** Desde cuándo se considera deuda/cobranza (alta de la institución). */
+  billingStart?: { year: number; month: number };
 }
 
 export type OrigenPago = 'efectivo' | 'tarjeta' | 'banco' | 'transferencia' | 'cheque' | 'otro';
