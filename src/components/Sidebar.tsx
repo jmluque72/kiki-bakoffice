@@ -19,7 +19,8 @@ import {
   Smartphone,
   ChevronDown,
   ChevronRight,
-  BarChart3
+  BarChart3,
+  Cake
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -93,6 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
             { icon: Users, label: 'Usuarios', key: 'usuarios' },
             { icon: UserPlus, label: 'Tutores', key: 'tutores' },
             { icon: GraduationCap, label: 'Alumnos', key: 'alumnos' },
+            { icon: Cake, label: 'Cumpleaños', key: 'cumpleanos' },
             { icon: Shield, label: 'Quién Retira', key: 'pickup' },
           ],
         },
@@ -126,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeSection
           label: 'Sistema',
           icon: BarChart3,
           items: [
-            ...(canSeeNotifications ? [{ icon: BarChart3, label: 'Estadísticas de Login', key: 'login-stats' }] : []),
+            ...(isSuperAdmin ? [{ icon: BarChart3, label: 'Estadísticas de Login', key: 'login-stats' }] : []),
           ],
         },
       };

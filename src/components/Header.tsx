@@ -41,7 +41,24 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick, currentSection, onN
       usuarios: 'Usuarios',
       activity: 'Activity',
       eventos: 'Eventos',
-      divisiones: 'Divisiones'
+      divisiones: 'Divisiones',
+      cumpleanos: 'Cumpleaños',
+      alumnos: 'Alumnos',
+      tutores: 'Tutores',
+      coordinadores: 'Coordinadores',
+      pickup: 'Quién Retira',
+      formularios: 'Formularios',
+      documentos: 'Documentos',
+      asistencias: 'Asistencias',
+      'acciones-diarias': 'Acciones diarias',
+      'push-notifications': 'Push Notifications',
+      'notificaciones-pendientes': 'Notificaciones pendientes',
+      'notification-templates': 'Templates de notificaciones',
+      'account-config': 'Config. Institución',
+      'payment-config': 'Cobranzas — Configuración',
+      'payment-register': 'Cobranzas — Registro',
+      'payment-stats': 'Cobranzas — Estadísticas',
+      'login-stats': 'Estadísticas de Login',
     };
     return titles[section] || 'Dashboard';
   };

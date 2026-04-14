@@ -1,18 +1,20 @@
 import React, { useEffect } from 'react';
+import { createRoot, Root } from 'react-dom/client';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export interface NotificationProps {
   type: 'success' | 'error' | 'warning' | 'info';
   message: string;
-  isVisible: boolean;
+  /** Si no se envía, se asume visible (compat. con usos que solo montan/desmontan el componente). */
+  isVisible?: boolean;
   onClose: () => void;
   duration?: number;
 }
 
-export const Notification: React.FC<NotificationProps> = ({
+const NotificationView: React.FC<NotificationProps> = ({
   type,
   message,
-  isVisible,
+  isVisible = true,
   onClose,
   duration = 5000
 }) => {
@@ -59,7 +61,7 @@ export const Notification: React.FC<NotificationProps> = ({
   };
 
   return (
-    <div className={`fixed top-4 right-4 z-50 max-w-sm w-full`}>
+    <div className={`fixed top-4 right-4 z-[100] max-w-sm w-full pointer-events-auto`}>
       <div className={`border rounded-lg p-4 shadow-lg ${getStyles()}`}>
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 mt-0.5">
@@ -70,6 +72,7 @@ export const Notification: React.FC<NotificationProps> = ({
           </div>
           <div className="flex-shrink-0">
             <button
+              type="button"
               onClick={onClose}
               className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors"
             >
@@ -80,4 +83,50 @@ export const Notification: React.FC<NotificationProps> = ({
       </div>
     </div>
   );
-}; 
+};
+
+function pushToast(type: NotificationProps['type'], message: string) {
+  const wrap = document.createElement('div');
+  wrap.style.position = 'fixed';
+  wrap.style.top = '0';
+  wrap.style.left = '0';
+  wrap.style.right = '0';
+  wrap.style.bottom = '0';
+  wrap.style.pointerEvents = 'none';
+  wrap.style.zIndex = '9999';
+  document.body.appendChild(wrap);
+
+  const root: Root = createRoot(wrap);
+  const close = () => {
+    try {
+      root.unmount();
+    } catch {
+      /* ignore */
+    }
+    wrap.remove();
+  };
+
+  root.render(
+    <NotificationView
+      type={type}
+      message={message}
+      isVisible={true}
+      onClose={close}
+      duration={5000}
+    />
+  );
+}
+
+type NotificationWithStatic = React.FC<NotificationProps> & {
+  success: (message: string) => void;
+  error: (message: string) => void;
+  warning: (message: string) => void;
+  info: (message: string) => void;
+};
+
+export const Notification = Object.assign(NotificationView, {
+  success: (message: string) => pushToast('success', message),
+  error: (message: string) => pushToast('error', message),
+  warning: (message: string) => pushToast('warning', message),
+  info: (message: string) => pushToast('info', message)
+}) as NotificationWithStatic;

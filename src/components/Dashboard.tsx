@@ -23,6 +23,7 @@ import { LoginStatsSection } from './sections/LoginStatsSection';
 import { NotificationTemplatesSection } from './sections/NotificationTemplatesSection';
 import { AccountConfigSection } from './sections/AccountConfigSection';
 import { PaymentConfigSection } from './sections/PaymentConfigSection';
+import { BirthdaysSection } from './sections/BirthdaysSection';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard: React.FC = () => {
@@ -44,6 +45,12 @@ export const Dashboard: React.FC = () => {
 
     // Si el usuario no es adminaccount ni superadmin y trata de acceder a documentos, redirigir a divisiones
     if (activeSection === 'documentos' && userRole !== 'adminaccount' && !isSuperAdmin) {
+      setActiveSection('divisiones');
+      return <GruposSection userRole={userRole} />;
+    }
+
+    // Solo superadmin puede acceder a estadísticas de login/sistema
+    if (activeSection === 'login-stats' && !isSuperAdmin) {
       setActiveSection('divisiones');
       return <GruposSection userRole={userRole} />;
     }
@@ -85,6 +92,8 @@ export const Dashboard: React.FC = () => {
         return <StudentActionsSection isReadonly={isSuperAdmin} />;
       case 'alumnos':
         return <StudentsSection isReadonly={isSuperAdmin} />;
+      case 'cumpleanos':
+        return <BirthdaysSection isReadonly={isSuperAdmin} />;
       case 'pickup':
         return <PickupSection isReadonly={isSuperAdmin} />;
       case 'formularios':
