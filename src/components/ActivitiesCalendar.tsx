@@ -6,6 +6,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { apiClient } from '../config/api';
+import { toLocalDateStr, getMonthGridStart, getMonthGridEnd } from '../lib/utils';
 
 interface Activity {
   _id: string;
@@ -62,7 +63,7 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   const loadMonthActivities = async (date: Date) => {
     if (!selectedDivision) return;
@@ -78,8 +79,8 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
 
       const params = {
         divisionId: selectedDivision,
-        fechaInicio: startDate.toISOString().split('T')[0],
-        fechaFin: endDate.toISOString().split('T')[0]
+        fechaInicio: toLocalDateStr(startDate),
+        fechaFin: toLocalDateStr(endDate)
       };
 
       console.log('📅 [ACTIVITIES_CALENDAR] Cargando actividades del mes para:', params);
@@ -106,17 +107,14 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
     
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
-    const endDate = new Date(lastDay);
-    endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
-    
+    const startDate = getMonthGridStart(firstDay);
+    const endDate = getMonthGridEnd(lastDay);
+
     const days: CalendarDay[] = [];
     const currentDate = new Date(startDate);
-    
+
     while (currentDate <= endDate) {
-      const dateString = currentDate.toISOString().split('T')[0];
+      const dateString = toLocalDateStr(currentDate);
       const dayData = calendarData[dateString];
       const dayActivities = dayData ? dayData.actividades : [];
       
@@ -149,8 +147,7 @@ export const ActivitiesCalendar: React.FC<ActivitiesCalendarProps> = ({
   };
 
   const handleDayClick = (day: CalendarDay) => {
-    const dateString = day.date.toISOString().split('T')[0];
-    onDateClick(dateString, day.activities);
+    onDateClick(toLocalDateStr(day.date), day.activities);
   };
 
   useEffect(() => {

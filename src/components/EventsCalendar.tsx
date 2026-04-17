@@ -13,6 +13,7 @@ import {
 import { EventService, Event } from '../services/eventService';
 import { apiClient } from '../config/api';
 import * as XLSX from 'xlsx';
+import { toLocalDateStr, getMonthGridStart, getMonthGridEnd } from '../lib/utils';
 
 
 interface EventsCalendarProps {
@@ -45,7 +46,7 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   // Cargar eventos del mes actual
   const loadMonthEvents = async (date: Date) => {
@@ -62,8 +63,8 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
 
       const params = {
         divisionId: selectedDivision,
-        fechaInicio: startDate.toISOString().split('T')[0],
-        fechaFin: endDate.toISOString().split('T')[0]
+        fechaInicio: toLocalDateStr(startDate),
+        fechaFin: toLocalDateStr(endDate)
       };
 
       console.log('📅 [EVENTS_CALENDAR] Cargando eventos del mes para:', params);
@@ -93,19 +94,15 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
     const firstDay = new Date(year, month, 1);
     // Último día del mes
     const lastDay = new Date(year, month + 1, 0);
-    // Primer día de la semana del primer día del mes
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
-    // Último día de la semana del último día del mes
-    const endDate = new Date(lastDay);
-    endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
-    
+    // Primer y último día de la grilla (lunes primero, domingo último)
+    const startDate = getMonthGridStart(firstDay);
+    const endDate = getMonthGridEnd(lastDay);
+
     const days: CalendarDay[] = [];
     const currentDate = new Date(startDate);
-    
+
     while (currentDate <= endDate) {
-      const dateString = currentDate.toISOString().split('T')[0];
+      const dateString = toLocalDateStr(currentDate);
       const dayData = calendarData[dateString];
       const dayEvents = dayData ? dayData.eventos : [];
       
@@ -205,8 +202,8 @@ export const EventsCalendar: React.FC<EventsCalendarProps> = ({
 
       const params = new URLSearchParams({
         divisionId: selectedDivision,
-        fechaInicio: startDate.toISOString().split('T')[0],
-        fechaFin: endDate.toISOString().split('T')[0]
+        fechaInicio: toLocalDateStr(startDate),
+        fechaFin: toLocalDateStr(endDate)
       });
 
       console.log('📊 [EXPORT] Obteniendo eventos para exportar...', params.toString());

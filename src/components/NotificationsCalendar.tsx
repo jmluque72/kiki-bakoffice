@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Notification } from '../services/notificationService';
+import { toLocalDateStr, getMonthGridStart, getMonthGridEnd } from '../lib/utils';
 
 interface CalendarDay {
   date: Date;
@@ -34,22 +35,15 @@ export const NotificationsCalendar: React.FC<NotificationsCalendarProps> = ({
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     
-    // Día de la semana del primer día (0 = domingo, 1 = lunes, etc.)
-    const startDay = firstDay.getDay();
-    
-    // Calcular el primer día a mostrar (puede ser del mes anterior)
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - startDay);
-    
-    // Calcular el último día a mostrar
-    const endDate = new Date(lastDay);
-    endDate.setDate(endDate.getDate() + (6 - lastDay.getDay()));
-    
+    // Primer y último día de la grilla (lunes primero, domingo último)
+    const startDate = getMonthGridStart(firstDay);
+    const endDate = getMonthGridEnd(lastDay);
+
     const days: CalendarDay[] = [];
     const currentDate = new Date(startDate);
-    
+
     while (currentDate <= endDate) {
-      const dateString = currentDate.toISOString().split('T')[0];
+      const dateString = toLocalDateStr(currentDate);
       const dayData = calendarData[dateString];
       const dayNotifications = dayData ? dayData.notificaciones : [];
       
@@ -113,7 +107,7 @@ export const NotificationsCalendar: React.FC<NotificationsCalendarProps> = ({
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">

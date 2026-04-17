@@ -14,6 +14,7 @@ import { apiClient } from '../config/api';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { toLocalDateStr, getMonthGridStart } from '../lib/utils';
 
 interface StudentActionsCalendarProps {
   selectedDivision: string;
@@ -47,7 +48,7 @@ export const StudentActionsCalendar: React.FC<StudentActionsCalendarProps> = ({
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   // Cargar datos del calendario para el mes actual
   const loadMonthActions = async (date: Date) => {
@@ -62,8 +63,8 @@ export const StudentActionsCalendar: React.FC<StudentActionsCalendarProps> = ({
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
 
-      const fechaInicio = startDate.toISOString().split('T')[0];
-      const fechaFin = endDate.toISOString().split('T')[0];
+      const fechaInicio = toLocalDateStr(startDate);
+      const fechaFin = toLocalDateStr(endDate);
 
       console.log('📅 [ACTIONS_CALENDAR] Cargando acciones del mes para:', { 
         divisionId: selectedDivision, 
@@ -107,22 +108,21 @@ export const StudentActionsCalendar: React.FC<StudentActionsCalendarProps> = ({
     // Último día del mes
     const lastDay = new Date(year, month + 1, 0);
     
-    // Días del mes anterior para completar la primera semana
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    // Días del mes anterior para completar la primera semana (lunes primero)
+    const startDate = getMonthGridStart(firstDay);
 
     const days: CalendarDay[] = [];
     const currentDate = new Date(startDate);
 
     // Generar 42 días (6 semanas)
     for (let i = 0; i < 42; i++) {
-      const dateKey = currentDate.toISOString().split('T')[0];
+      const dateKey = toLocalDateStr(currentDate);
       const actionCount = calendarData[dateKey] || 0;
 
       days.push({
         date: new Date(currentDate),
         isCurrentMonth: currentDate.getMonth() === month,
-        isToday: dateKey === today.toISOString().split('T')[0],
+        isToday: dateKey === toLocalDateStr(today),
         actionCount,
         hasActions: actionCount > 0
       });
@@ -183,8 +183,8 @@ export const StudentActionsCalendar: React.FC<StudentActionsCalendarProps> = ({
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
       
-      const fechaInicio = startDate.toISOString().split('T')[0];
-      const fechaFin = endDate.toISOString().split('T')[0];
+      const fechaInicio = toLocalDateStr(startDate);
+      const fechaFin = toLocalDateStr(endDate);
 
       // Obtener todas las acciones del mes
       const allActions = await studentActionService.getDivisionActions(
@@ -298,9 +298,9 @@ export const StudentActionsCalendar: React.FC<StudentActionsCalendarProps> = ({
       const month = currentDate.getMonth() + 1;
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
-      
-      const fechaInicio = startDate.toISOString().split('T')[0];
-      const fechaFin = endDate.toISOString().split('T')[0];
+
+      const fechaInicio = toLocalDateStr(startDate);
+      const fechaFin = toLocalDateStr(endDate);
 
       // Obtener acciones del alumno para el mes usando el endpoint con rango de fechas
       const response = await apiClient.get(`/api/student-actions/log/student/${studentId}`, {

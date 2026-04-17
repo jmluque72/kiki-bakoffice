@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { AsistenciaService, Asistencia } from '../services/asistenciaService';
 import * as XLSX from 'xlsx';
+import { toLocalDateStr, getMonthGridStart } from '../lib/utils';
 
 interface AttendanceCalendarProps {
   selectedDivision: string;
@@ -43,7 +44,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
   ];
 
-  const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
   // Cargar datos del calendario para el mes actual
   const loadMonthAttendances = async (date: Date) => {
@@ -60,8 +61,8 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
 
       const params = {
         grupoId: selectedDivision,
-        fechaInicio: startDate.toISOString().split('T')[0],
-        fechaFin: endDate.toISOString().split('T')[0]
+        fechaInicio: toLocalDateStr(startDate),
+        fechaFin: toLocalDateStr(endDate)
       };
 
       console.log('📅 [CALENDAR] Cargando datos del calendario para:', params);
@@ -92,16 +93,15 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
     // Último día del mes
     const lastDay = new Date(year, month + 1, 0);
     
-    // Días del mes anterior para completar la primera semana
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    // Días del mes anterior para completar la primera semana (lunes primero)
+    const startDate = getMonthGridStart(firstDay);
 
     const days: CalendarDay[] = [];
     const currentDate = new Date(startDate);
 
     // Generar 42 días (6 semanas)
     for (let i = 0; i < 42; i++) {
-      const dateKey = currentDate.toISOString().split('T')[0];
+      const dateKey = toLocalDateStr(currentDate);
       const dayData = calendarData[dateKey];
       
       days.push({
@@ -136,18 +136,19 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
 
   // Manejar click en un día
   const handleDayClick = async (day: CalendarDay) => {
-    console.log('📅 [CALENDAR] Click en día:', day.date.toISOString().split('T')[0]);
+    const dayStr = toLocalDateStr(day.date);
+    console.log('📅 [CALENDAR] Click en día:', dayStr);
     console.log('📅 [CALENDAR] Tiene asistencias:', day.hasAttendance);
-    
+
     if (day.hasAttendance) {
       try {
-        console.log('📅 [CALENDAR] Cargando asistencias detalladas para:', day.date.toISOString().split('T')[0]);
+        console.log('📅 [CALENDAR] Cargando asistencias detalladas para:', dayStr);
         const asistencias = await AsistenciaService.getDayAsistencias(
-          day.date.toISOString().split('T')[0], 
+          dayStr,
           selectedDivision
         );
         console.log('📅 [CALENDAR] Asistencias detalladas cargadas:', asistencias);
-        onDateClick(day.date.toISOString().split('T')[0], asistencias);
+        onDateClick(dayStr, asistencias);
       } catch (error) {
         console.error('📅 [CALENDAR] Error cargando asistencias del día:', error);
       }
@@ -175,8 +176,8 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
       
-      const fechaInicio = startDate.toISOString().split('T')[0];
-      const fechaFin = endDate.toISOString().split('T')[0];
+      const fechaInicio = toLocalDateStr(startDate);
+      const fechaFin = toLocalDateStr(endDate);
 
       // Obtener todas las asistencias del mes en una sola llamada
       const allAsistencias = await AsistenciaService.getBackofficeAsistencias({
@@ -232,7 +233,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
       // Agregar días sin registro
       const currentDateForDays = new Date(startDate);
       while (currentDateForDays <= endDate) {
-        const fechaStr = currentDateForDays.toISOString().split('T')[0];
+        const fechaStr = toLocalDateStr(currentDateForDays);
         studentMap.forEach(student => {
           if (!student.dias[fechaStr]) {
             student.dias[fechaStr] = 'Sin registro';
@@ -271,7 +272,7 @@ export const AttendanceCalendar: React.FC<AttendanceCalendarProps> = ({
         
         const currentDateForRow = new Date(startDate);
         while (currentDateForRow <= endDate) {
-          const fechaStr = currentDateForRow.toISOString().split('T')[0];
+          const fechaStr = toLocalDateStr(currentDateForRow);
           row.push(student.dias[fechaStr] || 'Sin registro');
           currentDateForRow.setDate(currentDateForRow.getDate() + 1);
         }
