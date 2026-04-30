@@ -228,8 +228,13 @@ export const AccountsSection: React.FC<AccountsSectionProps> = ({ isReadonly = f
     setSelectedAccount(null);
   };
 
+  const loadInstitutions = async () => {
+    const response = await AccountService.getAccounts(currentPage, 10);
+    setInstitutions(response.accounts);
+    setTotalAccounts(response.total);
+  };
+
   const handleAdminUserCreated = () => {
-    // Recargar la lista de cuentas
     loadInstitutions();
   };
 
@@ -450,8 +455,21 @@ export const AccountsSection: React.FC<AccountsSectionProps> = ({ isReadonly = f
               {filteredInstitutions.map((institution) => (
                 <tr key={institution._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {institution.nombre}
+                    <div className="flex items-center gap-3">
+                      {institution.logoSignedUrl || institution.logo ? (
+                        <img
+                          src={institution.logoSignedUrl || config.getS3ImageUrl(institution.logo!)}
+                          alt={institution.nombre}
+                          className="w-8 h-8 rounded object-contain bg-gray-50 border border-gray-100 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                          <Building2 className="w-4 h-4 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="text-sm font-medium text-gray-900">
+                        {institution.nombre}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
